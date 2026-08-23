@@ -1,7 +1,12 @@
-@if (Model?.Players?.Any() == true)
+@{
+    var hasPlayers = Model?.Players?.Any() == true;
+    var hasActivity = Model?.ChatHistory?.Any() == true;
+}
+
+@if (hasPlayers || hasActivity)
 {
     <!-- Main Container: 2 Columns on Desktop, Stacked on Mobile -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:divide-x divide-line bg-surface-alt min-h-[200px]">
+    <div class="grid grid-cols-1 @(hasPlayers ? "lg:grid-cols-2 lg:divide-x" : string.Empty) gap-0 divide-line bg-surface-alt min-h-[200px]">
 
         <!-- Left Column: Live Feed (Chat & Events) -->
         <div class="flex flex-col bg-surface/30">
@@ -59,8 +64,10 @@
             </div>
         </div>
 
-        <!-- Right Column: Scoreboard -->
-        <div class="flex flex-col bg-surface/50">
+        @if (hasPlayers)
+        {
+            <!-- Right Column: Scoreboard -->
+            <div class="flex flex-col bg-surface/50">
             <!-- Header -->
             <div
                 class="grid grid-cols-[1fr_repeat(4,minmax(30px,40px))_30px] gap-1 px-3 py-2 border-b border-line text-[10px] font-bold text-muted uppercase tracking-wider select-none bg-surface-alt/50">
@@ -127,7 +134,8 @@
                     </div>
                 }
             </div>
-        </div>
+            </div>
+        }
     </div>
 }
 else
