@@ -114,7 +114,7 @@
 
     <!-- Body: Player List -->
     <div
-        class="relative flex-1 flex @(Model.ClientCount == 0 && Model.ChatHistory?.Any() != true ? "min-h-[60px] items-center" : "min-h-[120px]") bg-surface-alt">
+        class="relative flex-1 flex @(Model.ClientCount == 0 ? "min-h-[60px] items-center" : "min-h-[120px]") bg-surface-alt">
         <div id="server_clientactivity_@Model.Id" class="w-full">
             <ClientActivity Model="@Model"/>
         </div>
