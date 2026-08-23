@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,6 +25,7 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
     private static readonly TimeSpan ResponseTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ResponseQuietPeriod = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan MetadataLifetime = TimeSpan.FromMinutes(1);
+    private static readonly JsonSerializerOptions RadarJsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IPEndPoint _endpoint;
     private readonly string _password;
@@ -37,6 +39,9 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
     private string _hostname = "7 Days to Die Server";
     private string _map = "Unknown";
     private int _maxPlayers = 8;
+    private int _worldSize = 6144;
+    private string _world = "Unknown";
+    private string _saveName = "Unknown";
     private string _version = "7DTD";
     private bool _disposed;
 
@@ -89,6 +94,51 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
     {
     }
 
+    private async Task<string> BuildLiveRadarMapJsonAsync(CancellationToken token)
+    {
+        await RefreshMetadataAsync(token);
+        return JsonSerializer.Serialize(new
+        {
+            provider = "d7d",
+            name = _world,
+            alias = _world,
+            saveName = _saveName,
+            mapSize = new { x = _worldSize, y = 255, z = _worldSize },
+            tileSize = 128,
+            maxZoom = 4
+        }, RadarJsonOptions);
+    }
+
+    private async Task<string> BuildLiveRadarDataJsonAsync(CancellationToken token)
+    {
+        var players = await RefreshPlayersAsync(token);
+        var payload = players.Select(player => new
+        {
+            name = player.Name,
+            guid = player.EntityId,
+            location = new { x = player.PositionX, y = player.PositionY, z = player.PositionZ },
+            viewAngles = new { x = player.RotationX, y = player.RotationY, z = player.RotationZ },
+            radianAngles = new
+            {
+                x = player.RotationX * Math.PI / 180,
+                y = player.RotationY * Math.PI / 180,
+                z = player.RotationZ * Math.PI / 180
+            },
+            team = "survivors",
+            kills = player.ZombieKills,
+            deaths = player.Deaths,
+            score = player.Level,
+            playTime = 0,
+            weapon = "none",
+            health = player.Health,
+            isAlive = player.Health > 0,
+            id = FormattableString.Invariant(
+                $"{player.EntityId}:{player.PositionX:F1}:{player.PositionZ:F1}:{player.RotationY:F1}")
+        });
+
+        return JsonSerializer.Serialize(payload, RadarJsonOptions);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -117,13 +167,7 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
     private async Task<string[]> BuildStatusAsync(CancellationToken token)
     {
         await RefreshMetadataAsync(token);
-        var players = SevenDaysToDiePlayerParser.Parse(await ExecuteTelnetCommandAsync("listplayers", token));
-
-        _playersBySlot.Clear();
-        foreach (var player in players)
-        {
-            _playersBySlot[player.Slot] = player;
-        }
+        var players = await RefreshPlayersAsync(token);
 
         var response = new List<string>
         {
@@ -174,6 +218,8 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
             "ServerName") ?? _hostname;
         var world = ParsePreference(await ExecuteTelnetCommandAsync("getgamepref GameWorld", token), "GameWorld");
         var saveName = ParsePreference(await ExecuteTelnetCommandAsync("getgamepref GameName", token), "GameName");
+        _world = world ?? _world;
+        _saveName = saveName ?? _saveName;
         _map = string.Equals(world, "RWG", StringComparison.OrdinalIgnoreCase)
             ? saveName ?? world ?? _map
             : world ?? saveName ?? _map;
@@ -185,7 +231,26 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
             _maxPlayers = parsedMaxPlayers;
         }
 
+        var worldSize = ParsePreference(await ExecuteTelnetCommandAsync("getgamepref WorldGenSize", token),
+            "WorldGenSize");
+        if (int.TryParse(worldSize, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedWorldSize))
+        {
+            _worldSize = Math.Max(1024, parsedWorldSize);
+        }
+
         _metadataExpiresAt = DateTime.UtcNow + MetadataLifetime;
+    }
+
+    private async Task<IReadOnlyList<SevenDaysToDiePlayer>> RefreshPlayersAsync(CancellationToken token)
+    {
+        var players = SevenDaysToDiePlayerParser.Parse(await ExecuteTelnetCommandAsync("listplayers", token));
+        _playersBySlot.Clear();
+        foreach (var player in players)
+        {
+            _playersBySlot[player.Slot] = player;
+        }
+
+        return players;
     }
 
     private async Task<string> ExecuteIw4MAdminCommandAsync(string command, CancellationToken token)
@@ -199,6 +264,16 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
 
         var verb = commandMatch.Groups["verb"].Value.ToLowerInvariant();
         var arguments = commandMatch.Groups["arguments"].Value.Trim();
+
+        if (verb == "livemap")
+        {
+            return await BuildLiveRadarMapJsonAsync(token);
+        }
+
+        if (verb == "liveradar")
+        {
+            return await BuildLiveRadarDataJsonAsync(token);
+        }
 
         if (verb == "say")
         {

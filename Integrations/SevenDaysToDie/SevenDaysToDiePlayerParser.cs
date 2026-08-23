@@ -40,6 +40,8 @@ public static partial class SevenDaysToDiePlayerParser
             var platformId = GetValue(fields, "steamid") ?? GetValue(fields, "pltfmid") ??
                 GetValue(fields, "crossid") ?? entityId.ToString(CultureInfo.InvariantCulture);
             var address = NormalizeAddress(GetValue(fields, "ip"));
+            var position = ParseVector(line, "pos");
+            var rotation = ParseVector(line, "rot");
 
             players.Add(new SevenDaysToDiePlayer(
                 ParseInteger(playerMatch.Groups["slot"].Value),
@@ -50,7 +52,14 @@ public static partial class SevenDaysToDiePlayerParser
                 Math.Clamp(ParseInteger(GetValue(fields, "ping"), 999), 0, 999),
                 Math.Max(0, ParseInteger(GetValue(fields, "level"))),
                 Math.Max(0, ParseInteger(GetValue(fields, "zombies"))),
-                Math.Max(0, ParseInteger(GetValue(fields, "deaths")))));
+                Math.Max(0, ParseInteger(GetValue(fields, "deaths"))),
+                position.X,
+                position.Y,
+                position.Z,
+                rotation.X,
+                rotation.Y,
+                rotation.Z,
+                Math.Clamp(ParseInteger(GetValue(fields, "health"), 100), 0, 100)));
         }
 
         return players;
@@ -63,6 +72,21 @@ public static partial class SevenDaysToDiePlayerParser
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
             ? (int)parsed
             : fallback;
+
+    private static (double X, double Y, double Z) ParseVector(string line, string field)
+    {
+        var match = Regex.Match(line,
+            $@"(?:^|,\s*){Regex.Escape(field)}=\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)",
+            RegexOptions.IgnoreCase);
+
+        return match.Success
+            ? (ParseDouble(match.Groups[1].Value), ParseDouble(match.Groups[2].Value),
+                ParseDouble(match.Groups[3].Value))
+            : (0, 0, 0);
+    }
+
+    private static double ParseDouble(string value) =>
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed) ? parsed : 0;
 
     private static string NormalizeAddress(string value)
     {

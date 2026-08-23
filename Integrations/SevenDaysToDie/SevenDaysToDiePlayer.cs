@@ -9,4 +9,11 @@ public sealed record SevenDaysToDiePlayer(
     int Ping,
     int Level,
     int ZombieKills,
-    int Deaths);
+    int Deaths,
+    double PositionX,
+    double PositionY,
+    double PositionZ,
+    double RotationX,
+    double RotationY,
+    double RotationZ,
+    int Health);

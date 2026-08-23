@@ -14,6 +14,11 @@ Each entry in `IW4MAdminSettings.json` represents one game server and has its ow
 `Port`, `Password`, `ManualLogPath`, and optional `GameLogServerUrl`. This supports any mix of local and
 remote 7 Days to Die servers.
 
+Live Radar reads player coordinates through Telnet and proxies terrain tiles from the native 7DTD Web
+Dashboard. Enable `WebDashboardEnabled` and `EnableMapRendering` on the game server, create a restricted
+web token with access to `web.map`, and configure the dashboard URL, token name, and a local secret-file
+path. Mount the secret file read-only when IW4MAdmin runs in a container.
+
 Example server entry:
 
 ```json
@@ -24,8 +29,12 @@ Example server entry:
   "RConParserVersion": "7 Days to Die Parser",
   "EventParserVersion": "7 Days to Die Parser",
   "ManualLogPath": "/absolute/path/to/server-output.log",
-  "GameLogServerUrl": "http://203.0.113.10:1625"
+  "GameLogServerUrl": "http://203.0.113.10:1625",
+  "LiveRadarUrl": "http://203.0.113.10:8080",
+  "LiveRadarTokenName": "iw4m-radar",
+  "LiveRadarTokenSecretFile": "/run/secrets/7dtd_dashboard_token"
 }
 ```
 
-Omit `GameLogServerUrl` when IW4MAdmin can read `ManualLogPath` directly.
+Omit `GameLogServerUrl` when IW4MAdmin can read `ManualLogPath` directly. Each 7DTD server can use a
+different dashboard URL and token file.
