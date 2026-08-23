@@ -48,7 +48,9 @@ public static partial class SevenDaysToDiePlayerParser
                 string.IsNullOrWhiteSpace(name) ? "Unknown" : name,
                 address,
                 Math.Clamp(ParseInteger(GetValue(fields, "ping"), 999), 0, 999),
-                Math.Max(0, ParseInteger(GetValue(fields, "level")))));
+                Math.Max(0, ParseInteger(GetValue(fields, "level"))),
+                Math.Max(0, ParseInteger(GetValue(fields, "zombies"))),
+                Math.Max(0, ParseInteger(GetValue(fields, "deaths")))));
         }
 
         return players;

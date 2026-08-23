@@ -24,7 +24,7 @@ public sealed class Parser7DaysToDie : IParserDefinition
         rcon.DefaultRConPort = 8081;
         rcon.GuidNumberStyle = NumberStyles.Integer;
         rcon.FloodProtectInterval = 100;
-        rcon.StatusHeader.Pattern = "slot score ping networkid name address";
+        rcon.StatusHeader.Pattern = "slot score kills deaths ping networkid name address";
 
         rcon.HostnameStatus.Pattern = "^hostname: (.+)$";
         rcon.HostnameStatus.AddMapping(ParserRegex.GroupType.RConStatusHostname, 1);
@@ -36,13 +36,15 @@ public sealed class Parser7DaysToDie : IParserDefinition
         rcon.MaxPlayersStatus.AddMapping(ParserRegex.GroupType.RConStatusMaxPlayers, 1);
 
         rcon.Status.Pattern =
-            @"^(\d+) +(-?\d+) +(\d+) +(\d+) +""([^""\r\n]*)"" +(\d{1,3}(?:\.\d{1,3}){3}):\d+$";
+            @"^(\d+) +(-?\d+) +(\d+) +(\d+) +(\d+) +(\d+) +""([^""\r\n]*)"" +(\d{1,3}(?:\.\d{1,3}){3}):\d+$";
         rcon.Status.AddMapping(ParserRegex.GroupType.RConClientNumber, 1);
         rcon.Status.AddMapping(ParserRegex.GroupType.RConScore, 2);
-        rcon.Status.AddMapping(ParserRegex.GroupType.RConPing, 3);
-        rcon.Status.AddMapping(ParserRegex.GroupType.RConNetworkId, 4);
-        rcon.Status.AddMapping(ParserRegex.GroupType.RConName, 5);
-        rcon.Status.AddMapping(ParserRegex.GroupType.RConIpAddress, 6);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConKills, 3);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConDeaths, 4);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConPing, 5);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConNetworkId, 6);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConName, 7);
+        rcon.Status.AddMapping(ParserRegex.GroupType.RConIpAddress, 8);
 
         rcon.DefaultDvarValues.Add("version", version);
         rcon.DefaultDvarValues.Add("sv_running", "1");

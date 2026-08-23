@@ -131,11 +131,11 @@ public sealed partial class SevenDaysToDieRConConnection : IRConConnection
             $"map: {_map}",
             "gametype: Survival",
             $"players: {players.Count}/{_maxPlayers}",
-            "slot score ping networkid name address"
+            "slot score kills deaths ping networkid name address"
         };
 
         response.AddRange(players.Select(player =>
-            $"{player.Slot} {player.Level} {player.Ping} {player.NetworkId} \"{SanitizeName(player.Name)}\" {player.Address}:0"));
+            $"{player.Slot} {player.Level} {player.ZombieKills} {player.Deaths} {player.Ping} {player.NetworkId} \"{SanitizeName(player.Name)}\" {player.Address}:0"));
         return response.ToArray();
     }
 

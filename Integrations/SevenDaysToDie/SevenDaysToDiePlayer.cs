@@ -7,4 +7,6 @@ public sealed record SevenDaysToDiePlayer(
     string Name,
     string Address,
     int Ping,
-    int Level);
+    int Level,
+    int ZombieKills,
+    int Deaths);
