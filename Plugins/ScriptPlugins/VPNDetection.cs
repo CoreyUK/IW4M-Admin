@@ -34,7 +34,7 @@ public class VpnDetectionPlugin : IPluginV2
 
     public string Name => "VPN Detection Plugin";
     public string Author => "RaidMax";
-    public string Version => "2.1";
+    public string Version => "2.2";
 
     private const string VpnWhitelistKey = "Webfront::Profile::VPNWhitelist";
     private const string VpnAllowListKey = "Webfront::Nav::Admin::VPNAllowList";
@@ -46,6 +46,7 @@ public class VpnDetectionPlugin : IPluginV2
     private readonly IInteractionRegistration _interactionRegistration;
     private readonly IDatabaseContextFactory _contextFactory;
     private readonly ApplicationConfiguration _appConfig;
+    private readonly HashSet<string> _blockedAsns;
 
     public VpnDetectionPlugin(
         ILogger<VpnDetectionPlugin> logger,
@@ -59,13 +60,17 @@ public class VpnDetectionPlugin : IPluginV2
         _interactionRegistration = interactionRegistration;
         _contextFactory = contextFactory;
         _appConfig = manager.GetApplicationSettings().Configuration();
+        _blockedAsns = new HashSet<string>(
+            _config.BlockedAsns.Select(NormalizeAsn).Where(asn => asn is not null),
+            StringComparer.OrdinalIgnoreCase);
 
         IManagementEventSubscriptions.ClientStateAuthorized += OnClientAuthorized;
 
         RegisterInteractions();
 
-        _logger.LogInformation("{Name} {Version} by {Author} loaded. Enabled={Enabled}, Whitelisted={Count}",
-            Name, Version, Author, _config.Enabled, _config.VpnExceptionIds.Count);
+        _logger.LogInformation("{Name} {Version} by {Author} loaded. Enabled={Enabled}, Whitelisted={Count}, Provider={Provider}, BlockedAsns={AsnCount}",
+            Name, Version, Author, _config.Enabled, _config.VpnExceptionIds.Count,
+            string.IsNullOrWhiteSpace(_config.ProxyCheckApiKey) ? "xdefcon" : "proxycheck.io", _blockedAsns.Count);
     }
 
     private void RegisterInteractions()
@@ -119,7 +124,7 @@ public class VpnDetectionPlugin : IPluginV2
             {
                 Name = loc["WEBFRONT_NAV_VPN_TITLE"],
                 Description = loc["WEBFRONT_NAV_VPN_DESC"],
-                DisplayMeta = "ph-check-circle",
+                DisplayMeta = "ph-shield-check",
                 InteractionId = VpnAllowListKey,
                 MinimumPermission = EFClient.Permission.Moderator,
                 InteractionType = InteractionType.TemplateContent,
@@ -137,35 +142,64 @@ public class VpnDetectionPlugin : IPluginV2
                     };
                     var encodedMeta = Uri.EscapeDataString(JsonSerializer.Serialize(disallowInteraction));
 
+                    var provider = string.IsNullOrWhiteSpace(_config.ProxyCheckApiKey) ? "xdefcon" : "proxycheck.io";
+                    var asnCount = _config.BlockedAsns.Count;
+
                     // Rendered inside the webfront's card container; follows WebfrontCore/REDESIGN-GUIDE.md.
-                    var table = $@"<div class=""flex items-center gap-3 px-4 py-2.5 border-b border-line"">
-                            <h2 class=""flex-1 text-[11px] font-semibold uppercase tracking-wider text-muted"">{loc["WEBFRONT_NAV_VPN_TITLE"]}</h2>
-                            <span class=""font-mono text-[11px] px-1.5 py-1 rounded-full bg-surface-alt text-subtle tabular-nums"">{clients.Count}</span>
+                    var html = $@"<div class=""flex flex-wrap items-center gap-3 px-4 py-3 border-b border-line"">
+                            <div class=""flex items-center gap-2 min-w-0"">
+                                <span class=""w-8 h-8 shrink-0 rounded-lg bg-secondary/15 text-secondary flex items-center justify-center""><i class=""ph ph-shield-check text-lg""></i></span>
+                                <div class=""min-w-0"">
+                                    <h2 class=""text-sm font-semibold text-foreground leading-tight"">Whitelisted players</h2>
+                                    <p class=""text-xs text-muted leading-tight"">These players can connect through a VPN or a blocked network without being kicked.</p>
+                                </div>
+                            </div>
+                            <div class=""ml-auto flex items-center gap-2 text-[11px]"">
+                                <span class=""inline-flex items-center gap-1 px-2 py-1 rounded-full bg-surface-alt text-subtle font-mono tabular-nums""><i class=""ph ph-users""></i>{clients.Count}</span>
+                                <span class=""inline-flex items-center gap-1 px-2 py-1 rounded-full bg-surface-alt text-subtle"" title=""Lookup provider""><i class=""ph ph-globe-hemisphere-west""></i>{provider}</span>
+                                <span class=""inline-flex items-center gap-1 px-2 py-1 rounded-full bg-surface-alt text-subtle font-mono tabular-nums"" title=""Blocked networks (ASNs)""><i class=""ph ph-prohibit""></i>{asnCount} ASN</span>
+                            </div>
                         </div>";
 
                     if (clients.Count == 0)
                     {
-                        table += @"<div class=""flex flex-col items-center justify-center gap-2 py-10 text-muted text-sm"">
+                        html += @"<div class=""flex flex-col items-center justify-center gap-2 py-12 text-muted text-sm"">
                                 <i class=""ph ph-shield-check text-3xl text-secondary""></i>
                                 <span>No players are whitelisted.</span>
+                                <span class=""text-xs text-muted/70"">Use the shield button on a player's profile, or <code class=""font-mono"">!whitelistvpn</code> in game.</span>
                             </div>";
                     }
                     else
                     {
-                        table += @"<div class=""overflow-x-auto""><table class=""w-full text-sm"">
+                        html += @"<div class=""overflow-x-auto""><table class=""w-full text-sm"">
                             <thead><tr class=""text-[10px] font-semibold uppercase tracking-wider text-muted"">
                                 <th class=""text-left px-4 py-2.5 border-b border-line"">Player</th>
+                                <th class=""text-left px-4 py-2.5 border-b border-line"">Level</th>
+                                <th class=""text-left px-4 py-2.5 border-b border-line whitespace-nowrap"">Last seen</th>
                                 <th class=""text-left px-4 py-2.5 border-b border-line"">Client ID</th>
                                 <th class=""text-right px-4 py-2.5 border-b border-line""></th>
                             </tr></thead><tbody class=""divide-y divide-line"">";
 
-                        foreach (var client in clients)
+                        foreach (var client in clients.OrderByDescending(c => c.LastConnection))
                         {
                             var cleanName = System.Net.WebUtility.HtmlEncode(client.Name.StripColors());
-                            table += $@"<tr class=""hover:bg-surface-hover transition-colors"">
+                            var initial = cleanName.Length > 0 ? cleanName[..1].ToUpperInvariant() : "?";
+                            var levelClass = GetLevelColorClass(client.Level);
+                            var levelName = System.Net.WebUtility.HtmlEncode(client.Level.ToLocalizedLevelName());
+                            var lastSeen = DescribeAge(client.LastConnection);
+                            var lastSeenTitle = client.LastConnection.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'");
+
+                            html += $@"<tr class=""hover:bg-surface-hover transition-colors"">
                                     <td class=""px-4 py-2.5 align-middle"">
-                                        <a href=""/client/{client.ClientId}"" class=""font-semibold text-foreground hover:text-primary transition-colors"">{cleanName}</a>
+                                        <a href=""/client/{client.ClientId}"" class=""inline-flex items-center gap-2.5 min-w-0 group"">
+                                            <span class=""w-7 h-7 shrink-0 rounded-full bg-surface-alt border border-line text-[11px] font-bold text-subtle flex items-center justify-center"">{initial}</span>
+                                            <span class=""font-semibold text-foreground group-hover:text-primary transition-colors truncate"">{cleanName}</span>
+                                        </a>
                                     </td>
+                                    <td class=""px-4 py-2.5 align-middle"">
+                                        <span class=""inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide border border-current bg-transparent {levelClass}"">{levelName}</span>
+                                    </td>
+                                    <td class=""px-4 py-2.5 align-middle text-muted whitespace-nowrap"" title=""{lastSeenTitle}"">{lastSeen}</td>
                                     <td class=""px-4 py-2.5 align-middle font-mono tabular-nums text-muted"">#{client.ClientId}</td>
                                     <td class=""px-4 py-2.5 align-middle text-right"">
                                         <button type=""button"" class=""profile-action inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-error/40 bg-surface-alt text-xs font-semibold text-error hover:bg-error/10 transition-colors""
@@ -177,15 +211,41 @@ public class VpnDetectionPlugin : IPluginV2
                                 </tr>";
                         }
 
-                        table += "</tbody></table></div>";
+                        html += "</tbody></table></div>";
                     }
 
-                    return table;
+                    return html;
                 }
             };
 
             return Task.FromResult<IInteractionData>(interaction);
         });
+    }
+
+    private static string GetLevelColorClass(EFClient.Permission permission) => permission switch
+    {
+        EFClient.Permission.Console => "text-level-console",
+        EFClient.Permission.Owner => "text-level-owner",
+        EFClient.Permission.Creator => "text-level-owner",
+        EFClient.Permission.SeniorAdmin => "text-level-senioradmin",
+        EFClient.Permission.Administrator => "text-level-administrator",
+        EFClient.Permission.Moderator => "text-level-moderator",
+        EFClient.Permission.Trusted => "text-level-trusted",
+        EFClient.Permission.Flagged => "text-level-flagged",
+        EFClient.Permission.Banned => "text-red-500 font-bold",
+        _ => "text-slate-400"
+    };
+
+    private static string DescribeAge(DateTime when)
+    {
+        var age = DateTime.UtcNow - when.ToUniversalTime();
+        if (age < TimeSpan.Zero) age = TimeSpan.Zero;
+        if (age.TotalMinutes < 1) return "just now";
+        if (age.TotalHours < 1) return $"{(int)age.TotalMinutes} min ago";
+        if (age.TotalDays < 1) return $"{(int)age.TotalHours} h ago";
+        if (age.TotalDays < 30) return $"{(int)age.TotalDays} d ago";
+        if (age.TotalDays < 365) return $"{(int)(age.TotalDays / 30)} mo ago";
+        return $"{(int)(age.TotalDays / 365)} y ago";
     }
 
     private Task OnClientAuthorized(ClientStateAuthorizeEvent clientEvent, CancellationToken token)
@@ -215,41 +275,39 @@ public class VpnDetectionPlugin : IPluginV2
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get,
-                $"https://api.xdefcon.com/proxy/check/?ip={origin.IPAddressString}");
-            request.Headers.UserAgent.ParseAdd($"IW4MAdmin-{_appConfig.Id}");
+            var result = string.IsNullOrWhiteSpace(_config.ProxyCheckApiKey)
+                ? await LookupXdefconAsync(origin, token)
+                : await LookupProxyCheckAsync(origin, token);
 
-            using var response = await HttpClient.SendAsync(request, token);
-            var body = await response.Content.ReadAsStringAsync(token);
-
-            bool usingVpn;
-            try
+            if (result is null)
             {
-                using var json = JsonDocument.Parse(body);
-                var root = json.RootElement;
-                usingVpn = root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.True
-                           && root.TryGetProperty("proxy", out var proxy) && proxy.ValueKind == JsonValueKind.True;
-            }
-            catch
-            {
-                _logger.LogWarning("There was a problem checking client IP ({IP}) for VPN - {Message}",
-                    origin.IPAddressString, body);
                 return;
             }
 
-            if (!usingVpn)
+            var blockedAsn = !string.IsNullOrEmpty(result.Asn) && _blockedAsns.Contains(result.Asn);
+
+            if (!result.IsProxy && !blockedAsn)
             {
-                _logger.LogDebug("{Client} is not using a VPN", origin.ToString());
+                _logger.LogDebug("{Client} is not using a VPN (ASN {Asn})", origin.ToString(), result.Asn ?? "unknown");
                 return;
             }
 
-            _logger.LogInformation("{Origin} is using a VPN ({IP})", origin.ToString(), origin.IPAddressString);
+            _logger.LogInformation("{Origin} was blocked by VPN detection ({IP}, ASN {Asn}, proxy={Proxy}, rule={Rule}, blockedAsn={BlockedAsn})",
+                origin.ToString(), origin.IPAddressString, result.Asn ?? "unknown", result.IsProxy, result.IsCustomRule, blockedAsn);
 
-            var loc = Utilities.CurrentLocalization.LocalizationIndex;
-            var additionalInfo = string.IsNullOrEmpty(_appConfig.ContactUri)
-                ? string.Empty
-                : loc["SERVER_KICK_VPNS_NOTALLOWED_INFO"] + " " + _appConfig.ContactUri;
-            var message = (loc["SERVER_KICK_VPNS_NOTALLOWED"] + " " + additionalInfo).TrimEnd();
+            string message;
+            if ((blockedAsn || result.IsCustomRule) && !string.IsNullOrWhiteSpace(_config.BlockedNetworkKickMessage))
+            {
+                message = _config.BlockedNetworkKickMessage;
+            }
+            else
+            {
+                var loc = Utilities.CurrentLocalization.LocalizationIndex;
+                var additionalInfo = string.IsNullOrEmpty(_appConfig.ContactUri)
+                    ? string.Empty
+                    : loc["SERVER_KICK_VPNS_NOTALLOWED_INFO"] + " " + _appConfig.ContactUri;
+                message = (loc["SERVER_KICK_VPNS_NOTALLOWED"] + " " + additionalInfo).TrimEnd();
+            }
 
             origin.Kick(message, origin.CurrentServer.AsConsoleClient());
         }
@@ -257,6 +315,82 @@ public class VpnDetectionPlugin : IPluginV2
         {
             _logger.LogWarning(ex, "There was a problem checking client IP ({IP}) for VPN", origin.IPAddressString);
         }
+    }
+
+    private sealed record LookupResult(bool IsProxy, bool IsCustomRule, string Asn);
+
+    /// <summary>
+    /// proxycheck.io v2 lookup (used when an API key is configured). Returns the proxy flag,
+    /// whether the hit came from a custom rule on the proxycheck dashboard, and the ASN.
+    /// </summary>
+    private async Task<LookupResult> LookupProxyCheckAsync(EFClient origin, CancellationToken token)
+    {
+        var url = $"https://proxycheck.io/v2/{origin.IPAddressString}?vpn=1&asn=1&key={_config.ProxyCheckApiKey}&tag={origin.ClientId}";
+        var body = await GetAsync(url, token);
+
+        using var json = JsonDocument.Parse(body);
+        var root = json.RootElement;
+
+        var status = root.TryGetProperty("status", out var statusEl) ? statusEl.GetString() : null;
+        if (status == "error")
+        {
+            var msg = root.TryGetProperty("message", out var msgEl) ? msgEl.GetString() : body;
+            _logger.LogWarning("There was a problem checking client IP ({IP}) for VPN - {Message}", origin.IPAddressString, msg);
+            return null;
+        }
+
+        if (!root.TryGetProperty(origin.IPAddressString, out var entry) || entry.ValueKind != JsonValueKind.Object)
+        {
+            _logger.LogWarning("ProxyCheck returned no result for client IP ({IP})", origin.IPAddressString);
+            return null;
+        }
+
+        var isProxy = status == "ok" && entry.TryGetProperty("proxy", out var proxyEl) && proxyEl.GetString() == "yes";
+        var isRule = entry.TryGetProperty("type", out var typeEl) && typeEl.GetString() == "rule";
+        var asn = entry.TryGetProperty("asn", out var asnEl) ? NormalizeAsn(asnEl.GetString()) : null;
+
+        return new LookupResult(isProxy, isRule, asn);
+    }
+
+    /// <summary>
+    /// Key-less fallback lookup (api.xdefcon.com). No ASN data, so the ASN blocklist is not applied.
+    /// </summary>
+    private async Task<LookupResult> LookupXdefconAsync(EFClient origin, CancellationToken token)
+    {
+        var body = await GetAsync($"https://api.xdefcon.com/proxy/check/?ip={origin.IPAddressString}", token);
+
+        try
+        {
+            using var json = JsonDocument.Parse(body);
+            var root = json.RootElement;
+            var isProxy = root.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.True
+                          && root.TryGetProperty("proxy", out var proxy) && proxy.ValueKind == JsonValueKind.True;
+            return new LookupResult(isProxy, false, null);
+        }
+        catch
+        {
+            _logger.LogWarning("There was a problem checking client IP ({IP}) for VPN - {Message}", origin.IPAddressString, body);
+            return null;
+        }
+    }
+
+    private async Task<string> GetAsync(string url, CancellationToken token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.UserAgent.ParseAdd($"IW4MAdmin-{_appConfig.Id}");
+        using var response = await HttpClient.SendAsync(request, token);
+        return await response.Content.ReadAsStringAsync(token);
+    }
+
+    private static string NormalizeAsn(string asn)
+    {
+        if (string.IsNullOrWhiteSpace(asn))
+        {
+            return null;
+        }
+
+        asn = asn.Trim().ToUpperInvariant();
+        return asn.StartsWith("AS") ? asn : "AS" + asn;
     }
 
     private async Task<List<ClientWhitelistEntry>> GetClientsDataAsync(IReadOnlyCollection<int> clientIds,
@@ -271,7 +405,8 @@ public class VpnDetectionPlugin : IPluginV2
         await using var context = _contextFactory.CreateContext(false);
         return await context.Clients
             .Where(client => ids.Contains(client.ClientId))
-            .Select(client => new ClientWhitelistEntry(client.ClientId, client.CurrentAlias.Name))
+            .Select(client => new ClientWhitelistEntry(client.ClientId, client.CurrentAlias.Name, client.Level,
+                client.LastConnection))
             .ToListAsync(token);
     }
 
@@ -283,7 +418,7 @@ public class VpnDetectionPlugin : IPluginV2
         _logger.LogInformation("{Name} unloaded", Name);
     }
 
-    private sealed record ClientWhitelistEntry(int ClientId, string Name);
+    private sealed record ClientWhitelistEntry(int ClientId, string Name, EFClient.Permission Level, DateTime LastConnection);
 }
 
 /// <summary>
@@ -377,4 +512,22 @@ public class VpnDetectionConfiguration
     /// Client ids that are exempt from VPN detection.
     /// </summary>
     public List<int> VpnExceptionIds { get; set; } = new();
+
+    /// <summary>
+    /// proxycheck.io API key. When set, lookups use proxycheck.io (with ASN data) instead of the
+    /// key-less xdefcon fallback.
+    /// </summary>
+    public string ProxyCheckApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Autonomous system numbers ("AS12345") that are always blocked, e.g. datacenter / hosting
+    /// providers. Only applied when proxycheck.io is in use, because the fallback has no ASN data.
+    /// </summary>
+    public List<string> BlockedAsns { get; set; } = new();
+
+    /// <summary>
+    /// Kick message used when a client is blocked by the ASN list or a proxycheck custom rule.
+    /// Leave empty to use the standard VPN kick message.
+    /// </summary>
+    public string BlockedNetworkKickMessage { get; set; } = string.Empty;
 }
