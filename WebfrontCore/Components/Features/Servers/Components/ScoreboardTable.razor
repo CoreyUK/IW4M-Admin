@@ -167,6 +167,14 @@ else
                                         </a>
                                     </NotAuthorized>
                                 </AuthorizeView>
+                                @if (!string.IsNullOrWhiteSpace(client.TwitchUsername))
+                                {
+                                    <a href="https://twitch.tv/@client.TwitchUsername" target="_blank" rel="noopener noreferrer"
+                                       class="shrink-0 text-[#9146FF] hover:brightness-125 transition"
+                                       title="@($"twitch.tv/{client.TwitchUsername}")">
+                                        <i class="ph-fill ph-twitch-logo text-sm"></i>
+                                    </a>
+                                }
                                 @if (client.ZScore is not null and not 0)
                                 {
                                     <i class="ph-fill ph-lightning text-accent text-xs shrink-0" title="@AppState.LocOr("WEBFRONT_SCOREBOARD_RANKED", "Ranked")"></i>

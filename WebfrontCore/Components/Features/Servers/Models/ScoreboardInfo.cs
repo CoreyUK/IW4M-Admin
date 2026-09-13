@@ -27,4 +27,5 @@ public class ClientScoreboardInfo
     public double? ZScore { get; set; }
     public EFClient.TeamType Team { get; set; }
     public Data.Models.Client.EFClient.Permission Level { get; set; }
+    public string? TwitchUsername { get; set; }
 }

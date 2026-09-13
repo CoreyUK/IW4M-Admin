@@ -47,6 +47,11 @@ namespace SharedLibraryCore.Dtos
         public int Ping { get; set; }
         public SharedLibraryCore.Database.Models.EFClient.TeamType Team { get; set; }
         public string TeamName { get; set; }
+
+        /// <summary>
+        /// Twitch channel name the player linked with the !twitch command (null when not linked).
+        /// </summary>
+        public string TwitchUsername { get; set; }
         public bool HasTwoFactor { get; set; }
     }
 }

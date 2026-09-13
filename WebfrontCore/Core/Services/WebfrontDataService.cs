@@ -30,6 +30,9 @@ namespace WebfrontCore.Core.Services;
 
 public class WebfrontDataService : IWebfrontDataService
 {
+    /// <summary>Persistent meta key written by the TwitchLink script plugin.</summary>
+    private const string TwitchMetaKey = "TwitchUsername";
+
     private readonly IManager _manager;
     private readonly IServerDataViewer _serverDataViewer;
     private readonly IResourceQueryHelper<BanInfoRequest, BanInfo> _banQueryHelper;
@@ -173,6 +176,7 @@ public class WebfrontDataService : IWebfrontDataService
                             Ping = p.client.Ping,
                             Team = p.client.Team,
                             TeamName = p.client.TeamName,
+                            TwitchUsername = p.client.GetAdditionalProperty<string>(TwitchMetaKey),
                             ZScore = p.stats?.ZScore
                         };
 
@@ -244,6 +248,7 @@ public class WebfrontDataService : IWebfrontDataService
                         Ping = p.client.Ping,
                         Team = p.client.Team,
                         TeamName = p.client.TeamName,
+                        TwitchUsername = p.client.GetAdditionalProperty<string>(TwitchMetaKey),
                         ZScore = p.stats?.ZScore
                     };
 
@@ -388,11 +393,13 @@ public class WebfrontDataService : IWebfrontDataService
         {
             _metaService.GetPersistentMetaByLookup(EFMeta.ClientTagV2, EFMeta.ClientTagNameV2, client.ClientId),
             _metaService.GetPersistentMeta("GravatarEmail", client.ClientId),
+            _metaService.GetPersistentMeta(TwitchMetaKey, client.ClientId),
         };
 
         var persistentMeta = await Task.WhenAll(persistentMetaTask);
         var tag = persistentMeta[0];
         var gravatar = persistentMeta[1];
+        var twitch = persistentMeta[2];
         var note = await _metaService.GetPersistentMetaValue<ClientNoteMetaResponse>("ClientNotes", client.ClientId);
 
         if (tag?.Value != null)
@@ -533,6 +540,17 @@ public class WebfrontDataService : IWebfrontDataService
                 Key = "GravatarEmail",
                 Type = MetaType.Other,
                 Value = gravatar.Value
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(twitch?.Value))
+        {
+            clientDto.TwitchUsername = twitch.Value;
+            clientDto.Meta.Add(new InformationResponse()
+            {
+                Key = TwitchMetaKey,
+                Type = MetaType.Other,
+                Value = twitch.Value
             });
         }
 
@@ -690,6 +708,7 @@ public class WebfrontDataService : IWebfrontDataService
                 {
                     ClientName = clientData.client.Name,
                     ClientId = clientData.client.ClientId,
+                    TwitchUsername = clientData.client.GetAdditionalProperty<string>(TwitchMetaKey),
                     Score = Math.Max(clientData.client.Score, clientData.stats?.RoundScore ?? 0),
                     Ping = clientData.client.Ping,
                     Kills = GetLiveKills(server, clientData.client) ?? clientData.stats?.MatchData?.Kills,
