@@ -93,7 +93,7 @@ public class TwitchCommand : Command
     {
         Name = "twitch";
         Description = "link your Twitch channel to your profile (use \"clear\" to remove it)";
-        Alias = "tw";
+        Alias = "ttv"; // "tw" is already taken by a GameInterface command
         Permission = EFClient.Permission.User;
         RequiresTarget = false;
         Arguments =
