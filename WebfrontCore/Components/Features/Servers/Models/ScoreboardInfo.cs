@@ -28,4 +28,5 @@ public class ClientScoreboardInfo
     public EFClient.TeamType Team { get; set; }
     public Data.Models.Client.EFClient.Permission Level { get; set; }
     public string? TwitchUsername { get; set; }
+    public bool TwitchLive { get; set; }
 }

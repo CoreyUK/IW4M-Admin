@@ -154,9 +154,15 @@ else
                     @if (!string.IsNullOrWhiteSpace(Client.TwitchUsername))
                     {
                         <a href="https://twitch.tv/@Client.TwitchUsername" target="_blank" rel="noopener noreferrer"
-                           class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[#9146FF]/15 text-[#9146FF] hover:bg-[#9146FF]/25 transition-colors"
-                           title="@($"twitch.tv/{Client.TwitchUsername}")">
+                           class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold transition-colors @(Client.TwitchLive ? "bg-error/15 text-error hover:bg-error/25" : "bg-[#9146FF]/15 text-[#9146FF] hover:bg-[#9146FF]/25")"
+                           title="@(Client.TwitchLive ? $"LIVE on twitch.tv/{Client.TwitchUsername}" : $"twitch.tv/{Client.TwitchUsername}")">
                             <i class="ph-fill ph-twitch-logo text-sm"></i>
+                            @if (Client.TwitchLive)
+                            {
+                                <i class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></i>
+                                <span>LIVE</span>
+                                <span class="opacity-70">·</span>
+                            }
                             <span>@Client.TwitchUsername</span>
                         </a>
                     }

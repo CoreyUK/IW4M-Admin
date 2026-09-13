@@ -149,9 +149,15 @@ else
                 @if (!string.IsNullOrWhiteSpace(client.TwitchUsername))
                 {
                     <a href="https://twitch.tv/@client.TwitchUsername" target="_blank" rel="noopener noreferrer"
-                       class="ml-1.5 shrink-0 text-[#9146FF] hover:brightness-125 transition"
-                       title="@($"twitch.tv/{client.TwitchUsername}")" @onclick:stopPropagation>
+                       class="ml-1.5 shrink-0 inline-flex items-center gap-1 text-[#9146FF] hover:brightness-125 transition"
+                       title="@(client.TwitchLive ? $"LIVE on twitch.tv/{client.TwitchUsername}" : $"twitch.tv/{client.TwitchUsername}")" @onclick:stopPropagation>
                         <i class="ph-fill ph-twitch-logo text-xs"></i>
+                        @if (client.TwitchLive)
+                        {
+                            <span class="inline-flex items-center gap-0.5 text-[9px] font-bold tracking-wide text-error">
+                                <i class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></i>LIVE
+                            </span>
+                        }
                     </a>
                 }
             </div>

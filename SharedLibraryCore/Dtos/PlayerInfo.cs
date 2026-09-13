@@ -52,6 +52,11 @@ namespace SharedLibraryCore.Dtos
         /// Twitch channel name the player linked with the !twitch command (null when not linked).
         /// </summary>
         public string TwitchUsername { get; set; }
+
+        /// <summary>
+        /// True while the linked Twitch channel is streaming (maintained by the TwitchLink plugin).
+        /// </summary>
+        public bool TwitchLive { get; set; }
         public bool HasTwoFactor { get; set; }
     }
 }
