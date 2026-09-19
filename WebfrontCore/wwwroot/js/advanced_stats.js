@@ -183,12 +183,14 @@ function buildHitModel3d(canvas, container) {
     const green = new T.Color(0x2fa35a).convertSRGBToLinear();
     const hot = new T.Color(0xf03c3c).convertSRGBToLinear();
     const white = new T.Color(0xffffff);
-    const maxPct = Math.max(window.maxPercentage || 0, 0.0001);
     const zonePct = {};
     const zoneT = {};
     const zoneNames = ['head', 'neck', 'torso_upper', 'torso_mid', 'torso_lower', 'left_arm_upper', 'right_arm_upper', 'left_arm_lower', 'right_arm_lower',
         'left_hand', 'right_hand', 'left_leg_upper', 'right_leg_upper', 'left_leg_lower', 'right_leg_lower', 'left_foot', 'right_foot'];
-    zoneNames.forEach((z) => { zonePct[z] = hitPercentFor(z); zoneT[z] = Math.min(zonePct[z] / maxPct, 1); });
+    zoneNames.forEach((z) => { zonePct[z] = hitPercentFor(z); });
+    // scale the tint against the busiest zone, so the hottest spot is always full red
+    const maxPct = Math.max(0.0001, ...zoneNames.map((z) => zonePct[z]));
+    zoneNames.forEach((z) => { zoneT[z] = Math.min(zonePct[z] / maxPct, 1); });
 
     let tip = container.querySelector('.hitmodel-tip');
     if (!tip) {
