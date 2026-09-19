@@ -46,10 +46,11 @@
       ]
     },
     {
-      "library": "three@0.150.0",
+      "library": "three@0.147.0",
       "destination": "wwwroot/lib/three/",
       "files": [
-        "build/three.min.js"
+        "build/three.min.js",
+        "examples/js/loaders/GLTFLoader.js"
       ]
     }
   ]

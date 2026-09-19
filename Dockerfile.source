@@ -92,7 +92,7 @@ RUN printf '#!/bin/bash\nexport DOTNET_CLI_TELEMETRY_OPTOUT=1\ndotnet Lib/IW4MAd
  && cp WebfrontCore/wwwroot/css/user/user.css /publish/wwwroot/css/user/user.css \
  && cp WebfrontCore/wwwroot/js/app.min.js /publish/wwwroot/js/app.min.js \
  && cp WebfrontCore/wwwroot/js/user/user.js /publish/wwwroot/js/user/user.js \
- && cp WebfrontCore/wwwroot/lib/three/build/three.min.js /publish/wwwroot/js/three.min.js \
+ && cat WebfrontCore/wwwroot/lib/three/build/three.min.js WebfrontCore/wwwroot/lib/three/examples/js/loaders/GLTFLoader.js > /publish/wwwroot/js/three.min.js \
  && rsync -ar WebfrontCore/wwwroot/font/phosphor/ /publish/wwwroot/font/phosphor/ \
  && rsync -ar GameFiles/ /publish/GameFiles/ \
  && rsync -ar WebfrontCore/wwwroot/images/ /publish/wwwroot/images/ \

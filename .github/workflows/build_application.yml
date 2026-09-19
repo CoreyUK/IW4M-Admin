@@ -216,7 +216,7 @@ jobs:
           mkdir -p ${{ env.outputFolder }}/wwwroot/js
           mkdir -p ${{ env.outputFolder }}/wwwroot/js/user
           cp ${{ github.workspace }}/WebfrontCore/wwwroot/js/app.min.js ${{ env.outputFolder }}/wwwroot/js/app.min.js
-          cp ${{ github.workspace }}/WebfrontCore/wwwroot/lib/three/build/three.min.js ${{ env.outputFolder }}/wwwroot/js/three.min.js
+          cat ${{ github.workspace }}/WebfrontCore/wwwroot/lib/three/build/three.min.js ${{ github.workspace }}/WebfrontCore/wwwroot/lib/three/examples/js/loaders/GLTFLoader.js > ${{ env.outputFolder }}/wwwroot/js/three.min.js
           cp ${{ github.workspace }}/WebfrontCore/wwwroot/js/user/user.js ${{ env.outputFolder }}/wwwroot/js/user/user.js
           mkdir -p ${{ env.outputFolder }}/wwwroot/font
           mkdir -p ${{ env.outputFolder }}/wwwroot/font/phosphor
