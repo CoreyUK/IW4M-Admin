@@ -99,13 +99,21 @@ function hitPercentFor(name) {
             total += hit.percentage;
         }
     });
-    return total;
+    // the API reports fractions (0.25 = 25%)
+    return total * 100;
 }
 
 // Classify a vertex of a standing, A-posed humanoid into an IW4MAdmin hit
 // location from its normalised position: h = height from the feet as a
 // fraction of total height, d = sidewards distance from the centre line as a
 // fraction of total height, side = which side of the centre line it is on.
+// upper chest / abdomen / belt line, matching the game's torso_upper, torso_mid, torso_lower
+function torsoZone(h) {
+    if (h >= 0.67) return 'torso_upper';
+    if (h >= 0.565) return 'torso_mid';
+    return 'torso_lower';
+}
+
 function hitZoneForPoint(h, d, side, armReach, material) {
     const bodyHalf = 0.115;
     // the model's material names are a much better guide than raw position
@@ -114,7 +122,7 @@ function hitZoneForPoint(h, d, side, armReach, material) {
     if (m.indexOf('shoe') >= 0 || m.indexOf('boot') >= 0) return side + '_foot';
     if (m.indexOf('helmet') >= 0 || m.indexOf('band') >= 0 || m.indexOf('scope') >= 0 || m.indexOf('hair') >= 0) return 'head';
     if (m.indexOf('scarf') >= 0) return 'neck';
-    if (m.indexOf('vest') >= 0 || m.indexOf('pouch') >= 0) return 'torso_upper';
+    if (m.indexOf('vest') >= 0 || m.indexOf('pouch') >= 0) return torsoZone(h);
     if (m.indexOf('belt') >= 0) return 'torso_lower';
     if (m.indexOf('pant') >= 0 || m.indexOf('trouser') >= 0) {
         if (h >= 0.49) return 'torso_lower';
@@ -137,8 +145,7 @@ function hitZoneForPoint(h, d, side, armReach, material) {
     }
     if (h >= 0.865) return 'head';
     if (h >= 0.83) return 'neck';
-    if (h >= 0.62) return 'torso_upper';
-    if (h >= 0.49) return 'torso_lower';
+    if (h >= 0.49) return torsoZone(h);
     if (h >= 0.29) return side + '_leg_upper';
     if (h >= 0.075) return side + '_leg_lower';
     return side + '_foot';
@@ -179,7 +186,7 @@ function buildHitModel3d(canvas, container) {
     const maxPct = Math.max(window.maxPercentage || 0, 0.0001);
     const zonePct = {};
     const zoneT = {};
-    const zoneNames = ['head', 'neck', 'torso_upper', 'torso_lower', 'left_arm_upper', 'right_arm_upper', 'left_arm_lower', 'right_arm_lower',
+    const zoneNames = ['head', 'neck', 'torso_upper', 'torso_mid', 'torso_lower', 'left_arm_upper', 'right_arm_upper', 'left_arm_lower', 'right_arm_lower',
         'left_hand', 'right_hand', 'left_leg_upper', 'right_leg_upper', 'left_leg_lower', 'right_leg_lower', 'left_foot', 'right_foot'];
     zoneNames.forEach((z) => { zonePct[z] = hitPercentFor(z); zoneT[z] = Math.min(zonePct[z] / maxPct, 1); });
 
@@ -352,7 +359,9 @@ function buildHitModel3d(canvas, container) {
     let pickTick = 0;
 
     function prettyName(name) {
-        return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        const labels = { torso_upper: 'Upper Torso', torso_mid: 'Mid Torso', torso_lower: 'Lower Torso', head: 'Head', neck: 'Neck' };
+        if (labels[name]) return labels[name];
+        return name.replace(/_/g, ' ').replace(/\w/g, (c) => c.toUpperCase());
     }
 
     function animate() {
