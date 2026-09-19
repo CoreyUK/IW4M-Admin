@@ -35,7 +35,7 @@ window.initAdvancedStats = function (history, hitLocations, maxPct, performanceT
 let hitModel3d = null;
 
 function loadThree(callback) {
-    if (window.THREE) {
+    if (window.THREE && window.THREE.CapsuleGeometry) {
         callback();
         return;
     }
@@ -45,7 +45,7 @@ function loadThree(callback) {
     }
     window.__threeLoading = [callback];
     const script = document.createElement('script');
-    script.src = '/js/three.min.js';
+    script.src = '/js/three.min.js?v=150';
     script.onload = () => {
         const pending = window.__threeLoading;
         window.__threeLoading = null;
@@ -428,11 +428,18 @@ function buildHitModel3d(canvas, container) {
 }
 
 function drawPlayerModel2d() {
-    const canvas = document.getElementById('hitlocation_model');
+    let canvas = document.getElementById('hitlocation_model');
     if (canvas === null) {
         return;
     }
-    const context = canvas.getContext('2d');
+    let context = canvas.getContext('2d');
+    if (!context) {
+        // the canvas was claimed by a failed WebGL attempt; swap in a fresh one
+        const fresh = canvas.cloneNode(false);
+        canvas.parentNode.replaceChild(fresh, canvas);
+        canvas = fresh;
+        context = canvas.getContext('2d');
+    }
     const container = document.getElementById('hitlocation_container');
     if (!container) {
         return;
