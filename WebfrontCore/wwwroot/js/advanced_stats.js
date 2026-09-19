@@ -113,79 +113,163 @@ function buildHitModel3d(canvas, container) {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
     const scene = new T.Scene();
-    const camera = new T.PerspectiveCamera(32, 1, 0.1, 100);
-    camera.position.set(0, 0.15, 7.2);
+    const camera = new T.PerspectiveCamera(30, 1, 0.1, 100);
+    camera.position.set(0, 0.1, 7.6);
 
-    scene.add(new T.AmbientLight(0xffffff, 0.55));
-    const key = new T.DirectionalLight(0xffffff, 0.9);
-    key.position.set(3, 5, 4);
+    scene.add(new T.HemisphereLight(0xdfe7ff, 0x2a2420, 0.4));
+    const key = new T.DirectionalLight(0xfff1dc, 0.7);
+    key.position.set(3, 6, 5);
     scene.add(key);
-    const rim = new T.DirectionalLight(0x88aaff, 0.35);
-    rim.position.set(-4, 2, -3);
+    const rim = new T.DirectionalLight(0x7fa6ff, 0.3);
+    rim.position.set(-5, 3, -4);
     scene.add(rim);
 
     const rig = new T.Group();
     scene.add(rig);
 
-    const base = new T.Color(0x3b4250);
-    const hot = new T.Color(0xef4444);
+    // palette
+    const uniform = new T.Color(0x4a5640);   // olive fatigues
+    const gear = new T.Color(0x23272e);      // vest, pouches, boots
+    const metal = new T.Color(0x171a1f);     // rifle, helmet rail
+    const skin = new T.Color(0x9a7358);
+    const hot = new T.Color(0xf03c3c);
     const maxPct = Math.max(window.maxPercentage || 0, 0.0001);
 
-    const parts = {};
-    function addPart(name, geometry, x, y, z, rx, ry, rz) {
-        const pct = hitPercentFor(name);
-        const t = Math.min(pct / maxPct, 1);
-        const colour = base.clone().lerp(hot, Math.pow(t, 0.75));
+    // one group per hit location; every mesh inside is tinted by that zone's share
+    const zones = {};
+    function zone(name) {
+        if (!zones[name]) {
+            const g = new T.Group();
+            const pct = hitPercentFor(name);
+            g.userData = { name: name, pct: pct, t: Math.min(pct / maxPct, 1) };
+            rig.add(g);
+            zones[name] = g;
+        }
+        return zones[name];
+    }
+
+    function tinted(baseColour, t, shade) {
+        const c = baseColour.clone().multiplyScalar(shade === undefined ? 1 : shade);
+        return c.lerp(hot, Math.pow(t, 1.6) * 0.9);
+    }
+
+    function part(zoneName, geometry, baseColour, x, y, z, rx, ry, rz, shade, rough) {
+        const g = zone(zoneName);
+        const t = g.userData.t;
         const material = new T.MeshStandardMaterial({
-            color: colour,
-            roughness: 0.55,
-            metalness: 0.1,
-            emissive: hot.clone().multiplyScalar(0.35 * t),
+            color: tinted(baseColour, t, shade),
+            roughness: rough === undefined ? 0.7 : rough,
+            metalness: 0.08,
+            emissive: hot.clone().multiplyScalar(0.22 * Math.pow(t, 1.6)),
         });
         const mesh = new T.Mesh(geometry, material);
         mesh.position.set(x, y, z);
         mesh.rotation.set(rx || 0, ry || 0, rz || 0);
-        mesh.userData = { name: name, pct: pct, baseColour: colour.clone(), baseEmissive: material.emissive.clone() };
-        rig.add(mesh);
-        parts[name] = mesh;
+        mesh.userData.baseColour = material.color.clone();
+        mesh.userData.baseEmissive = material.emissive.clone();
+        mesh.userData.zone = zoneName;
+        g.add(mesh);
         return mesh;
     }
 
-    // Proportions in metres-ish; the rig is centred on the hips.
-    addPart('head', new T.SphereGeometry(0.34, 24, 18), 0, 1.72, 0);
-    // helmet shell sits on top of the head and shares the head's tint
-    const helmet = addPart('head', new T.SphereGeometry(0.39, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), 0, 1.76, 0);
-    helmet.material.color.multiplyScalar(0.85);
-    addPart('neck', new T.CylinderGeometry(0.14, 0.17, 0.22, 16), 0, 1.36, 0);
-    addPart('torso_upper', new T.BoxGeometry(1.0, 0.78, 0.5, 2, 2, 2), 0, 0.86, 0);
-    addPart('torso_lower', new T.BoxGeometry(0.86, 0.6, 0.46, 2, 2, 2), 0, 0.17, 0);
+    // prop meshes that belong to no zone (rifle) - drawn but not hit-tinted
+    const props = new T.Group();
+    rig.add(props);
+    function prop(geometry, colour, x, y, z, rx, ry, rz, rough) {
+        const mesh = new T.Mesh(geometry, new T.MeshStandardMaterial({ color: colour, roughness: rough === undefined ? 0.5 : rough, metalness: 0.35 }));
+        mesh.position.set(x, y, z);
+        mesh.rotation.set(rx || 0, ry || 0, rz || 0);
+        props.add(mesh);
+        return mesh;
+    }
 
-    // arms: the model faces the camera, so its right side is on the viewer's left
-    const armX = 0.72;
-    addPart('right_arm_upper', new T.CylinderGeometry(0.15, 0.13, 0.62, 14), -armX, 0.88, 0, 0, 0, 0.18);
-    addPart('left_arm_upper', new T.CylinderGeometry(0.15, 0.13, 0.62, 14), armX, 0.88, 0, 0, 0, -0.18);
-    addPart('right_arm_lower', new T.CylinderGeometry(0.13, 0.11, 0.6, 14), -armX - 0.1, 0.3, 0.05, 0, 0, 0.12);
-    addPart('left_arm_lower', new T.CylinderGeometry(0.13, 0.11, 0.6, 14), armX + 0.1, 0.3, 0.05, 0, 0, -0.12);
-    addPart('right_hand', new T.SphereGeometry(0.14, 14, 10), -armX - 0.16, -0.08, 0.08);
-    addPart('left_hand', new T.SphereGeometry(0.14, 14, 10), armX + 0.16, -0.08, 0.08);
+    const cap = (r, len, seg) => new T.CapsuleGeometry(r, len, 6, seg || 14);
+    const box = (w, h, d) => new T.BoxGeometry(w, h, d);
+    const cyl = (rt, rb, h, seg) => new T.CylinderGeometry(rt, rb, h, seg || 16);
 
-    const legX = 0.24;
-    addPart('right_leg_upper', new T.CylinderGeometry(0.2, 0.17, 0.78, 14), -legX, -0.52, 0);
-    addPart('left_leg_upper', new T.CylinderGeometry(0.2, 0.17, 0.78, 14), legX, -0.52, 0);
-    addPart('right_leg_lower', new T.CylinderGeometry(0.16, 0.13, 0.78, 14), -legX, -1.3, 0);
-    addPart('left_leg_lower', new T.CylinderGeometry(0.16, 0.13, 0.78, 14), legX, -1.3, 0);
-    addPart('right_foot', new T.BoxGeometry(0.28, 0.18, 0.46), -legX, -1.76, 0.1);
-    addPart('left_foot', new T.BoxGeometry(0.28, 0.18, 0.46), legX, -1.76, 0.1);
+    // ---------------- head ----------------
+    part('head', new T.SphereGeometry(0.3, 26, 20), skin, 0, 1.78, 0.02);            // face/skull
+    part('head', new T.SphereGeometry(0.36, 26, 14, 0, Math.PI * 2, 0, Math.PI * 0.6), gear, 0, 1.84, -0.02, 0, 0, 0, 1.15, 0.55); // helmet dome
+    part('head', cyl(0.37, 0.39, 0.09, 26), gear, 0, 1.72, -0.02, 0, 0, 0, 1.0, 0.55);   // helmet brim
+    part('head', box(0.4, 0.06, 0.2), gear, 0, 1.63, 0.16, 0.25, 0, 0, 0.7);             // chin strap / NVG mount shadow
+    part('head', box(0.34, 0.09, 0.05), metal, 0, 1.6, 0.27, 0, 0, 0, 1.2, 0.3);         // eye pro
+    part('neck', cyl(0.12, 0.15, 0.24, 16), skin, 0, 1.44, 0);
+
+    // ---------------- torso ----------------
+    part('torso_upper', cap(0.42, 0.55, 18), uniform, 0, 0.98, 0, 0, 0, 0, 1, 0.75);   // chest
+    part('torso_upper', box(0.78, 0.62, 0.34), gear, 0, 0.95, 0.12, 0, 0, 0, 1, 0.8);   // plate carrier front
+    part('torso_upper', box(0.78, 0.58, 0.16), gear, 0, 0.95, -0.24, 0, 0, 0, 0.85, 0.8); // back panel
+    part('torso_upper', box(0.16, 0.34, 0.1), gear, -0.22, 1.0, 0.31, 0, 0, 0, 1.25);     // magazine pouches
+    part('torso_upper', box(0.16, 0.34, 0.1), gear, 0, 1.0, 0.31, 0, 0, 0, 1.25);
+    part('torso_upper', box(0.16, 0.34, 0.1), gear, 0.22, 1.0, 0.31, 0, 0, 0, 1.25);
+    part('torso_upper', new T.SphereGeometry(0.2, 16, 12), uniform, -0.5, 1.28, 0, 0, 0, 0, 0.95); // shoulders
+    part('torso_upper', new T.SphereGeometry(0.2, 16, 12), uniform, 0.5, 1.28, 0, 0, 0, 0, 0.95);
+    part('torso_lower', cap(0.36, 0.3, 18), uniform, 0, 0.36, 0, 0, 0, 0, 0.95, 0.75);  // abdomen
+    part('torso_lower', cyl(0.42, 0.42, 0.14, 20), gear, 0, 0.16, 0, 0, 0, 0, 1.1);      // belt
+    part('torso_lower', box(0.18, 0.2, 0.14), gear, -0.32, 0.12, 0.28, 0, 0.5, 0, 1.3);  // hip pouches
+    part('torso_lower', box(0.18, 0.2, 0.14), gear, 0.32, 0.12, 0.28, 0, -0.5, 0, 1.3);
+    part('torso_lower', box(0.2, 0.28, 0.12), gear, 0.36, 0.1, -0.22, 0, 0, 0, 1.2);     // holster
+
+    // ---------------- arms (model faces the camera: its right = viewer's left) ----------------
+    // relaxed pose, elbows slightly bent, hands forward as if holding the rifle low
+    function arm(side) {
+        const s = side === 'right' ? -1 : 1;
+        const up = s * 0.62;
+        const g1 = part(side + '_arm_upper', cap(0.13, 0.5, 16), uniform, up, 0.98, 0.02, 0.35, 0, s * -0.18);
+        part(side + '_arm_upper', cyl(0.16, 0.14, 0.14, 16), uniform, up + s * 0.02, 1.2, 0, 0, 0, s * -0.18, 0.9); // sleeve roll
+        part(side + '_arm_lower', new T.SphereGeometry(0.12, 14, 10), uniform, up + s * 0.06, 0.66, 0.16, 0, 0, 0, 0.9);    // elbow
+        part(side + '_arm_lower', cap(0.11, 0.42, 16), uniform, up + s * 0.05, 0.5, 0.42, 1.25, 0, s * -0.1);              // forearm forward
+        part(side + '_hand', new T.SphereGeometry(0.13, 14, 10), gear, up + s * 0.02, 0.44, 0.7, 0, 0, 0, 0.9);              // glove
+        part(side + '_hand', box(0.14, 0.1, 0.16), gear, up + s * 0.02, 0.4, 0.78, 0, 0, 0, 0.8);                           // fingers
+        return g1;
+    }
+    arm('right');
+    arm('left');
+
+    // ---------------- legs ----------------
+    function leg(side) {
+        const s = side === 'right' ? -1 : 1;
+        const x = s * 0.24;
+        part(side + '_leg_upper', cap(0.19, 0.5, 16), uniform, x, -0.42, 0, 0.04, 0, s * -0.03);
+        part(side + '_leg_upper', box(0.2, 0.22, 0.16), uniform, x + s * 0.12, -0.42, 0.06, 0, 0, 0, 0.85);          // cargo pocket
+        part(side + '_leg_lower', new T.SphereGeometry(0.17, 14, 10), gear, x, -0.86, 0.06, 0, 0, 0, 1.2);          // knee pad
+        part(side + '_leg_lower', cap(0.15, 0.5, 16), uniform, x, -1.24, 0, -0.02, 0, 0);
+        part(side + '_foot', box(0.26, 0.24, 0.3), gear, x, -1.66, -0.02, 0, 0, 0, 1.0, 0.6);                        // boot upper
+        part(side + '_foot', box(0.28, 0.14, 0.5), gear, x, -1.78, 0.1, 0, 0, 0, 0.8, 0.6);                         // boot sole/toe
+    }
+    leg('right');
+    leg('left');
+
+    // ---------------- rifle, held low across the body ----------------
+    const rifle = new T.Group();
+    rifle.position.set(0.05, 0.42, 0.72);
+    rifle.rotation.set(0, 0, -0.35);
+    rifle.rotation.y = 0.25;
+    props.add(rifle);
+    function rpart(geometry, colour, x, y, z, rx, ry, rz) {
+        const m = new T.Mesh(geometry, new T.MeshStandardMaterial({ color: colour, roughness: 0.45, metalness: 0.5 }));
+        m.position.set(x, y, z);
+        m.rotation.set(rx || 0, ry || 0, rz || 0);
+        rifle.add(m);
+    }
+    rpart(box(1.0, 0.11, 0.09), metal, 0.1, 0, 0);                 // upper receiver
+    rpart(box(0.6, 0.1, 0.08), metal, -0.1, -0.1, 0);              // lower receiver
+    rpart(cyl(0.028, 0.028, 0.7, 10), metal, 0.85, 0.01, 0, 0, 0, Math.PI / 2); // barrel
+    rpart(box(0.42, 0.09, 0.09), gear, 0.5, 0.0, 0, 0, 0, 0);       // handguard
+    rpart(box(0.08, 0.26, 0.06), metal, -0.05, -0.26, 0, 0, 0, 0.15); // magazine
+    rpart(box(0.08, 0.16, 0.05), gear, -0.28, -0.2, 0, 0, 0, 0.35);   // grip
+    rpart(box(0.42, 0.1, 0.07), gear, -0.62, -0.04, 0, 0, 0, 0);      // stock
+    rpart(box(0.16, 0.06, 0.06), metal, 0.05, 0.09, 0);               // optic
+    rpart(cyl(0.035, 0.035, 0.18, 10), metal, 0.05, 0.14, 0, 0, 0, Math.PI / 2);
 
     rig.position.y = 0.05;
 
-    // ground shadow disc
-    const disc = new T.Mesh(new T.CircleGeometry(0.9, 32), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 }));
+    const disc = new T.Mesh(new T.CircleGeometry(0.95, 32), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 }));
     disc.rotation.x = -Math.PI / 2;
     disc.position.y = -1.86;
     scene.add(disc);
 
-    // tooltip
+    // ---------------- overlay elements ----------------
     let tip = container.querySelector('.hitmodel-tip');
     if (!tip) {
         tip = document.createElement('div');
@@ -204,13 +288,13 @@ function buildHitModel3d(canvas, container) {
 
     const raycaster = new T.Raycaster();
     const pointer = new T.Vector2(2, 2);
-    let hovered = null;
+    let hoveredZone = null;
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
-    let spin = 0;          // user-applied yaw
-    let tilt = 0;          // user-applied pitch
-    let idleSpin = 0.35;   // radians per second while untouched
+    let spin = 0.35;
+    let tilt = 0;
+    const idleSpin = 0.3;
     let lastTouch = 0;
 
     function resize() {
@@ -228,15 +312,15 @@ function buildHitModel3d(canvas, container) {
         const rect = canvas.getBoundingClientRect();
         pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        tip.style.left = (event.clientX - container.getBoundingClientRect().left + 14) + 'px';
-        tip.style.top = (event.clientY - container.getBoundingClientRect().top - 10) + 'px';
+        const crect = container.getBoundingClientRect();
+        tip.style.left = (event.clientX - crect.left + 14) + 'px';
+        tip.style.top = (event.clientY - crect.top - 10) + 'px';
     }
-
     function onMove(event) {
         setPointer(event);
         if (dragging) {
             spin += (event.clientX - lastX) * 0.012;
-            tilt = Math.max(-0.6, Math.min(0.6, tilt + (event.clientY - lastY) * 0.006));
+            tilt = Math.max(-0.5, Math.min(0.5, tilt + (event.clientY - lastY) * 0.006));
             lastX = event.clientX;
             lastY = event.clientY;
             lastTouch = performance.now();
@@ -268,9 +352,23 @@ function buildHitModel3d(canvas, container) {
     const clock = new T.Clock();
     let frame = 0;
     let disposed = false;
+    const zoneGroups = Object.values(zones);
+    const pickables = [];
+    zoneGroups.forEach((g) => g.children.forEach((m) => pickables.push(m)));
 
     function prettyName(name) {
         return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    function setZoneHighlight(g, on) {
+        g.children.forEach((m) => {
+            if (on) {
+                m.material.color.copy(m.userData.baseColour).lerp(new T.Color(0xffffff), 0.3);
+                m.material.emissive.set(0x555555);
+            } else {
+                m.material.color.copy(m.userData.baseColour);
+                m.material.emissive.copy(m.userData.baseEmissive);
+            }
+        });
     }
 
     function animate() {
@@ -279,30 +377,27 @@ function buildHitModel3d(canvas, container) {
         }
         frame = requestAnimationFrame(animate);
         const dt = Math.min(clock.getDelta(), 0.05);
+        const now = performance.now();
 
-        // resume the idle spin a couple of seconds after the last drag
-        const idle = performance.now() - lastTouch > 2000;
-        if (idle && !dragging) {
+        if (!dragging && now - lastTouch > 2000) {
             spin += idleSpin * dt;
             tilt += (0 - tilt) * Math.min(1, dt * 2);
         }
         rig.rotation.y = spin;
         rig.rotation.x = tilt;
+        rig.position.y = 0.05 + Math.sin(now / 900) * 0.012; // breathing
 
-        // hover pick
         raycaster.setFromCamera(pointer, camera);
-        const hits = raycaster.intersectObjects(rig.children, false);
-        const target = hits.length ? hits[0].object : null;
-        if (target !== hovered) {
-            if (hovered) {
-                hovered.material.color.copy(hovered.userData.baseColour);
-                hovered.material.emissive.copy(hovered.userData.baseEmissive);
+        const hits = raycaster.intersectObjects(pickables, false);
+        const target = hits.length ? zones[hits[0].object.userData.zone] : null;
+        if (target !== hoveredZone) {
+            if (hoveredZone) {
+                setZoneHighlight(hoveredZone, false);
             }
-            hovered = target;
-            if (hovered) {
-                hovered.material.color.copy(hovered.userData.baseColour).lerp(new T.Color(0xffffff), 0.35);
-                hovered.material.emissive.set(0x666666);
-                tip.textContent = prettyName(hovered.userData.name) + ' · ' + hovered.userData.pct.toFixed(1) + '%';
+            hoveredZone = target;
+            if (hoveredZone) {
+                setZoneHighlight(hoveredZone, true);
+                tip.textContent = prettyName(hoveredZone.userData.name) + ' · ' + hoveredZone.userData.pct.toFixed(1) + '%';
                 tip.style.opacity = '1';
             } else {
                 tip.style.opacity = '0';
@@ -322,7 +417,7 @@ function buildHitModel3d(canvas, container) {
             canvas.removeEventListener('pointerdown', onDown);
             window.removeEventListener('pointerup', onUp);
             canvas.removeEventListener('pointerleave', onLeave);
-            rig.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
+            rig.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
             disc.geometry.dispose();
             disc.material.dispose();
             renderer.dispose();
