@@ -28,7 +28,31 @@ public partial class ClientActivity
     /// True when the lobby has players on both teams, so the board can be split like the in-game scoreboard.
     /// </summary>
     private bool HasTeams => Model?.Players is not null &&
+                             IsTeamGameType(Model) &&
                              ScoreboardTeams.All(team => Model.Players.Any(player => player.Team == team));
+
+    /// <summary>
+    /// The game still puts free-for-all players on allies/axis internally, so the team columns in the
+    /// kill log are meaningless there. Only split the board for gametypes that actually have sides.
+    /// </summary>
+    private static readonly HashSet<string> SoloGameTypeCodes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "dm", "ffa", "gun", "oic", "oneflag_dm", "infect", "zom", "zclassic", "zstandard", "zgrief", "zcleansed", "zsurvival", "coop", "arena"
+    };
+
+    private static readonly string[] SoloGameTypeNames = ["free for all", "gun game", "one in the chamber", "infected", "zombies", "survival"];
+
+    private static bool IsTeamGameType(ServerInfo model)
+    {
+        var code = model.GameTypeCode?.Trim();
+        if (!string.IsNullOrEmpty(code) && SoloGameTypeCodes.Contains(code))
+        {
+            return false;
+        }
+
+        var name = model.GameType?.Trim().ToLowerInvariant();
+        return string.IsNullOrEmpty(name) || !SoloGameTypeNames.Any(name.Contains);
+    }
 
     private IEnumerable<PlayerInfo> TeamPlayers(SharedLibraryCore.Database.Models.EFClient.TeamType team) =>
         Model!.Players!.Where(player => player.Team == team).OrderByDescending(player => player.Score);

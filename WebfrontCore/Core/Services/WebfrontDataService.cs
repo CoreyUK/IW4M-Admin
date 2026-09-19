@@ -137,6 +137,8 @@ public class WebfrontDataService : IWebfrontDataService
                 MaxClients = server.MaxClients,
                 PrivateClientSlots = server.PrivateClientSlots,
                 GameType = server.GametypeName,
+            GameTypeCode = server.Gametype,
+                GameTypeCode = server.Gametype,
                 ClientHistory = new ClientHistoryInfo
                 {
                     ClientCounts = GetCombinedClientHistory(
