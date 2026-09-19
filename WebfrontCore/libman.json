@@ -1,4 +1,4 @@
-{
+﻿{
   "version": "3.0",
   "defaultProvider": "jsdelivr",
   "libraries": [
@@ -43,6 +43,13 @@
         "src/fill/Phosphor-Fill.woff2",
         "src/fill/Phosphor-Fill.woff",
         "src/fill/Phosphor-Fill.ttf"
+      ]
+    },
+    {
+      "library": "three@0.128.0",
+      "destination": "wwwroot/lib/three/",
+      "files": [
+        "build/three.min.js"
       ]
     }
   ]

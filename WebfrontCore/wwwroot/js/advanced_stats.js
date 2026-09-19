@@ -1,5 +1,7 @@
 ﻿window.onresize = function () {
-    if (window.hitLocationData) {
+    if (hitModel3d) {
+        hitModel3d.resize();
+    } else if (window.hitLocationData) {
         drawPlayerModel();
     }
 }
@@ -20,7 +22,317 @@ window.initAdvancedStats = function (history, hitLocations, maxPct, performanceT
     drawPlayerModel();
 }
 
+// ---------------------------------------------------------------------------
+// 3D hit-location model
+//
+// Builds a low-poly soldier out of primitives, one mesh per hit location, and
+// tints each part from grey to red by its share of the player's hits. Slow
+// auto-rotate, drag to spin, hover a part to read the figure. three.js is
+// fetched on demand (only the stats page needs it); if WebGL is unavailable
+// the old 2D silhouette is drawn instead.
+// ---------------------------------------------------------------------------
+
+let hitModel3d = null;
+
+function loadThree(callback) {
+    if (window.THREE) {
+        callback();
+        return;
+    }
+    if (window.__threeLoading) {
+        window.__threeLoading.push(callback);
+        return;
+    }
+    window.__threeLoading = [callback];
+    const script = document.createElement('script');
+    script.src = '/js/three.min.js';
+    script.onload = () => {
+        const pending = window.__threeLoading;
+        window.__threeLoading = null;
+        pending.forEach((cb) => cb());
+    };
+    script.onerror = () => {
+        window.__threeLoading = null;
+        drawPlayerModel2d();
+    };
+    document.head.appendChild(script);
+}
+
+function webglAvailable() {
+    try {
+        const probe = document.createElement('canvas');
+        return !!(window.WebGLRenderingContext && (probe.getContext('webgl') || probe.getContext('experimental-webgl')));
+    } catch (e) {
+        return false;
+    }
+}
+
 function drawPlayerModel() {
+    const canvas = document.getElementById('hitlocation_model');
+    const container = document.getElementById('hitlocation_container');
+    if (!canvas || !container) {
+        return;
+    }
+    if (!webglAvailable()) {
+        drawPlayerModel2d();
+        return;
+    }
+    loadThree(() => {
+        if (!document.getElementById('hitlocation_model')) {
+            return; // navigated away while loading
+        }
+        try {
+            buildHitModel3d(canvas, container);
+        } catch (e) {
+            console.warn('3D hit model failed, falling back to 2D', e);
+            drawPlayerModel2d();
+        }
+    });
+}
+
+function hitPercentFor(name) {
+    const data = window.hitLocationData || [];
+    let total = 0;
+    data.forEach((hit) => {
+        // the helmet is drawn as part of the head
+        if (hit.name === name || (name === 'head' && hit.name === 'helmet')) {
+            total += hit.percentage;
+        }
+    });
+    return total;
+}
+
+function buildHitModel3d(canvas, container) {
+    if (hitModel3d) {
+        hitModel3d.dispose();
+        hitModel3d = null;
+    }
+
+    const T = window.THREE;
+    const renderer = new T.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    const scene = new T.Scene();
+    const camera = new T.PerspectiveCamera(32, 1, 0.1, 100);
+    camera.position.set(0, 0.15, 7.2);
+
+    scene.add(new T.AmbientLight(0xffffff, 0.55));
+    const key = new T.DirectionalLight(0xffffff, 0.9);
+    key.position.set(3, 5, 4);
+    scene.add(key);
+    const rim = new T.DirectionalLight(0x88aaff, 0.35);
+    rim.position.set(-4, 2, -3);
+    scene.add(rim);
+
+    const rig = new T.Group();
+    scene.add(rig);
+
+    const base = new T.Color(0x3b4250);
+    const hot = new T.Color(0xef4444);
+    const maxPct = Math.max(window.maxPercentage || 0, 0.0001);
+
+    const parts = {};
+    function addPart(name, geometry, x, y, z, rx, ry, rz) {
+        const pct = hitPercentFor(name);
+        const t = Math.min(pct / maxPct, 1);
+        const colour = base.clone().lerp(hot, Math.pow(t, 0.75));
+        const material = new T.MeshStandardMaterial({
+            color: colour,
+            roughness: 0.55,
+            metalness: 0.1,
+            emissive: hot.clone().multiplyScalar(0.35 * t),
+        });
+        const mesh = new T.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        mesh.rotation.set(rx || 0, ry || 0, rz || 0);
+        mesh.userData = { name: name, pct: pct, baseColour: colour.clone(), baseEmissive: material.emissive.clone() };
+        rig.add(mesh);
+        parts[name] = mesh;
+        return mesh;
+    }
+
+    // Proportions in metres-ish; the rig is centred on the hips.
+    addPart('head', new T.SphereGeometry(0.34, 24, 18), 0, 1.72, 0);
+    // helmet shell sits on top of the head and shares the head's tint
+    const helmet = addPart('head', new T.SphereGeometry(0.39, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), 0, 1.76, 0);
+    helmet.material.color.multiplyScalar(0.85);
+    addPart('neck', new T.CylinderGeometry(0.14, 0.17, 0.22, 16), 0, 1.36, 0);
+    addPart('torso_upper', new T.BoxGeometry(1.0, 0.78, 0.5, 2, 2, 2), 0, 0.86, 0);
+    addPart('torso_lower', new T.BoxGeometry(0.86, 0.6, 0.46, 2, 2, 2), 0, 0.17, 0);
+
+    // arms: the model faces the camera, so its right side is on the viewer's left
+    const armX = 0.72;
+    addPart('right_arm_upper', new T.CylinderGeometry(0.15, 0.13, 0.62, 14), -armX, 0.88, 0, 0, 0, 0.18);
+    addPart('left_arm_upper', new T.CylinderGeometry(0.15, 0.13, 0.62, 14), armX, 0.88, 0, 0, 0, -0.18);
+    addPart('right_arm_lower', new T.CylinderGeometry(0.13, 0.11, 0.6, 14), -armX - 0.1, 0.3, 0.05, 0, 0, 0.12);
+    addPart('left_arm_lower', new T.CylinderGeometry(0.13, 0.11, 0.6, 14), armX + 0.1, 0.3, 0.05, 0, 0, -0.12);
+    addPart('right_hand', new T.SphereGeometry(0.14, 14, 10), -armX - 0.16, -0.08, 0.08);
+    addPart('left_hand', new T.SphereGeometry(0.14, 14, 10), armX + 0.16, -0.08, 0.08);
+
+    const legX = 0.24;
+    addPart('right_leg_upper', new T.CylinderGeometry(0.2, 0.17, 0.78, 14), -legX, -0.52, 0);
+    addPart('left_leg_upper', new T.CylinderGeometry(0.2, 0.17, 0.78, 14), legX, -0.52, 0);
+    addPart('right_leg_lower', new T.CylinderGeometry(0.16, 0.13, 0.78, 14), -legX, -1.3, 0);
+    addPart('left_leg_lower', new T.CylinderGeometry(0.16, 0.13, 0.78, 14), legX, -1.3, 0);
+    addPart('right_foot', new T.BoxGeometry(0.28, 0.18, 0.46), -legX, -1.76, 0.1);
+    addPart('left_foot', new T.BoxGeometry(0.28, 0.18, 0.46), legX, -1.76, 0.1);
+
+    rig.position.y = 0.05;
+
+    // ground shadow disc
+    const disc = new T.Mesh(new T.CircleGeometry(0.9, 32), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28 }));
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.y = -1.86;
+    scene.add(disc);
+
+    // tooltip
+    let tip = container.querySelector('.hitmodel-tip');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.className = 'hitmodel-tip';
+        tip.style.cssText = 'position:absolute;pointer-events:none;padding:4px 8px;border-radius:6px;background:rgba(15,19,24,.92);border:1px solid rgba(255,255,255,.12);font:600 11px/1.3 ui-monospace,monospace;color:#fff;white-space:nowrap;opacity:0;transition:opacity .12s;z-index:5';
+        container.appendChild(tip);
+    }
+    let hint = container.querySelector('.hitmodel-hint');
+    if (!hint) {
+        hint = document.createElement('div');
+        hint.className = 'hitmodel-hint';
+        hint.style.cssText = 'position:absolute;right:10px;bottom:8px;font:10px ui-monospace,monospace;color:rgba(255,255,255,.35);pointer-events:none';
+        hint.textContent = 'drag to rotate · hover for %';
+        container.appendChild(hint);
+    }
+
+    const raycaster = new T.Raycaster();
+    const pointer = new T.Vector2(2, 2);
+    let hovered = null;
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let spin = 0;          // user-applied yaw
+    let tilt = 0;          // user-applied pitch
+    let idleSpin = 0.35;   // radians per second while untouched
+    let lastTouch = 0;
+
+    function resize() {
+        const width = Math.max(container.clientWidth - 16, 120);
+        const height = Math.max(container.clientHeight - 16, 120);
+        renderer.setSize(width, height, false);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+    }
+    resize();
+
+    function setPointer(event) {
+        const rect = canvas.getBoundingClientRect();
+        pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        tip.style.left = (event.clientX - container.getBoundingClientRect().left + 14) + 'px';
+        tip.style.top = (event.clientY - container.getBoundingClientRect().top - 10) + 'px';
+    }
+
+    function onMove(event) {
+        setPointer(event);
+        if (dragging) {
+            spin += (event.clientX - lastX) * 0.012;
+            tilt = Math.max(-0.6, Math.min(0.6, tilt + (event.clientY - lastY) * 0.006));
+            lastX = event.clientX;
+            lastY = event.clientY;
+            lastTouch = performance.now();
+        }
+    }
+    function onDown(event) {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        lastTouch = performance.now();
+        canvas.style.cursor = 'grabbing';
+    }
+    function onUp() {
+        dragging = false;
+        canvas.style.cursor = 'grab';
+    }
+    function onLeave() {
+        pointer.set(2, 2);
+        dragging = false;
+        canvas.style.cursor = 'grab';
+    }
+    canvas.style.cursor = 'grab';
+    canvas.style.touchAction = 'none';
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointerleave', onLeave);
+
+    const clock = new T.Clock();
+    let frame = 0;
+    let disposed = false;
+
+    function prettyName(name) {
+        return name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+
+    function animate() {
+        if (disposed) {
+            return;
+        }
+        frame = requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        // resume the idle spin a couple of seconds after the last drag
+        const idle = performance.now() - lastTouch > 2000;
+        if (idle && !dragging) {
+            spin += idleSpin * dt;
+            tilt += (0 - tilt) * Math.min(1, dt * 2);
+        }
+        rig.rotation.y = spin;
+        rig.rotation.x = tilt;
+
+        // hover pick
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(rig.children, false);
+        const target = hits.length ? hits[0].object : null;
+        if (target !== hovered) {
+            if (hovered) {
+                hovered.material.color.copy(hovered.userData.baseColour);
+                hovered.material.emissive.copy(hovered.userData.baseEmissive);
+            }
+            hovered = target;
+            if (hovered) {
+                hovered.material.color.copy(hovered.userData.baseColour).lerp(new T.Color(0xffffff), 0.35);
+                hovered.material.emissive.set(0x666666);
+                tip.textContent = prettyName(hovered.userData.name) + ' · ' + hovered.userData.pct.toFixed(1) + '%';
+                tip.style.opacity = '1';
+            } else {
+                tip.style.opacity = '0';
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    hitModel3d = {
+        resize: resize,
+        dispose: function () {
+            disposed = true;
+            cancelAnimationFrame(frame);
+            canvas.removeEventListener('pointermove', onMove);
+            canvas.removeEventListener('pointerdown', onDown);
+            window.removeEventListener('pointerup', onUp);
+            canvas.removeEventListener('pointerleave', onLeave);
+            rig.children.forEach((m) => { m.geometry.dispose(); m.material.dispose(); });
+            disc.geometry.dispose();
+            disc.material.dispose();
+            renderer.dispose();
+            tip.remove();
+            hint.remove();
+        },
+    };
+}
+
+function drawPlayerModel2d() {
     const canvas = document.getElementById('hitlocation_model');
     if (canvas === null) {
         return;

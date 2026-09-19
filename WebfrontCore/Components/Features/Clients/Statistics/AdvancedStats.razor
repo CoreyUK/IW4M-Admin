@@ -1,4 +1,4 @@
-@page "/Client/Statistics/{ClientId:int}/Advanced"
+﻿@page "/Client/Statistics/{ClientId:int}/Advanced"
 @page "/client/{ClientId:int}/stats"
 @rendermode InteractiveServer
 @attribute [Authorize(Policy = "Permissions.ProfilePage.Read")]
@@ -204,7 +204,7 @@
                         }
 
                         <!-- Hit location model canvas (ids are used by advanced_stats.js) -->
-                        <div class="relative h-64 flex items-center justify-center p-4 border-t border-line bg-surface-alt/40"
+                        <div class="relative h-80 flex items-center justify-center p-2 border-t border-line bg-surface-alt/40 overflow-hidden"
                              id="hitlocation_container">
                             <canvas id="hitlocation_model" class="w-full h-full object-contain"></canvas>
                         </div>
