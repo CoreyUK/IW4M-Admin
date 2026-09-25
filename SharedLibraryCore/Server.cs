@@ -126,6 +126,12 @@ namespace SharedLibraryCore
         public string GametypeName => DefaultSettings.Gametypes?.FirstOrDefault(gt => gt.Game == GameName)?.Gametypes
             ?.FirstOrDefault(gt => gt.Name == Gametype)?.Alias ?? Gametype;
 
+        /// <summary>
+        ///     Current zombies round, published by the game scripts into the cuk_round dvar.
+        ///     Null on servers that are not running zombies or have not reported one.
+        /// </summary>
+        public int? ZombieRound { get; set; }
+
         public string GamePassword { get; protected set; }
         public int PrivateClientSlots { get; protected set; }
         public Map CurrentMap { get; set; }

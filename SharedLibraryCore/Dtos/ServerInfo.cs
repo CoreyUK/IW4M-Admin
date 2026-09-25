@@ -15,6 +15,9 @@ namespace SharedLibraryCore.Dtos
         public string GameType { get; set; }
         /// <summary>Raw gametype code from the server (dm, tdm, dom, ...), used to decide whether a scoreboard has teams.</summary>
         public string GameTypeCode { get; set; }
+
+        /// <summary>Current zombies round, when the server reports one.</summary>
+        public int? ZombieRound { get; set; }
         public int ClientCount { get; set; }
         public int MaxClients { get; set; }
         public int PrivateClientSlots { get; set; }

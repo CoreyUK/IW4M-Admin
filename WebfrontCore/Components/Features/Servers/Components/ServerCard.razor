@@ -65,6 +65,14 @@
         <!-- Map / mode / rating -->
         <div class="mt-0.5 flex items-center gap-1.5 flex-wrap text-[13px] text-subtle">
             <span class="font-semibold text-foreground">@Model.Map</span>
+            @if (Model.ZombieRound.HasValue)
+            {
+                <span class="text-muted/60">&middot;</span>
+                <span class="inline-flex items-center gap-1 font-semibold text-primary" title="Current round">
+                    <i class="ph ph-skull"></i>
+                    <span>Round @Model.ZombieRound</span>
+                </span>
+            }
             @if (!string.IsNullOrEmpty(Model.GameType) && Model.GameType.Length > 1)
             {
                 <span class="text-muted">&middot;</span>

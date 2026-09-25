@@ -1043,6 +1043,7 @@ namespace IW4MAdmin
             UpdateGametype(statusResponse.GameType);
             UpdateHostname(statusResponse.Hostname);
             UpdateMaxPlayers(statusResponse.MaxClients);
+            await UpdateZombieRound(token);
 
             // Check and update fail-state status
             _stateChecker.CheckAndUpdateFailState();
@@ -1093,6 +1094,32 @@ namespace IW4MAdmin
             using(LogContext.PushProperty("Server", Id))
             {
                 ServerLogger.LogDebug("Updating map to {@CurrentMap}", CurrentMap);
+            }
+        }
+
+        /// <summary>
+        ///     Reads the round the zombies scripts publish into the cuk_round dvar. Servers
+        ///     without the script simply never define it, so the round stays null there.
+        /// </summary>
+        private async Task UpdateZombieRound(CancellationToken token)
+        {
+            if (!this.IsZombieServer())
+            {
+                ZombieRound = null;
+                return;
+            }
+
+            try
+            {
+                var dvar = await this.GetDvarAsync<string>("cuk_round", token: token);
+                ZombieRound = int.TryParse(dvar?.Value?.StripColors().Trim(), out var round) && round > 0
+                    ? round
+                    : null;
+            }
+            catch
+            {
+                // a server without the script answers "unknown command"; nothing to report
+                ZombieRound = null;
             }
         }
 
