@@ -1,0 +1,228 @@
+/* CUK Zombie Record Badges */
+
+/* Fallback when cuk-webfront.js has not run: the generic tag icon becomes a trophy. */
+.ph.ph-tag {
+    background: none !important;
+    color: var(--color-primary, currentColor) !important;
+}
+
+.ph.ph-tag::before {
+    content: "\e67e" !important;
+}
+
+/* Badge panels take a full row of the profile grid instead of one column of it,
+   and their tiles flow into as many columns as the width allows. The other
+   categories pair up above them. */
+@media (min-width: 1024px) {
+    .grid:has(> .cuk-badge-panel) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    .cuk-badge-panel {
+        grid-column: 1 / -1;
+        border-left-width: 0 !important;
+        border-top: 1px solid var(--color-line, #404040);
+        padding: 1rem 0 0 !important;
+        margin-top: 0.25rem;
+    }
+
+    /* A zombies player has no multiplayer stats, so cuk-webfront.js hides that
+       panel. General Information would then sit alone in a two-column row with
+       a hole beside it, so it takes the whole row and flows its tiles the same
+       way the panels below it do. */
+    .grid:has(> [data-cuk-hidden]) > .space-y-3:not(.cuk-badge-panel):not([data-cuk-hidden]) {
+        grid-column: 1 / -1;
+        border-left-width: 0 !important;
+    }
+
+    .grid:has(> [data-cuk-hidden]) > .space-y-3:not(.cuk-badge-panel):not([data-cuk-hidden]) > .grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+    }
+}
+
+.cuk-badge-panel .grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) !important;
+    align-items: stretch;
+}
+
+/* Rows stay level: the game label sits at the bottom of every tile. */
+.cuk-badge {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.cuk-badge > div:last-child {
+    margin-top: auto;
+    padding-top: 0.4rem;
+}
+
+/* Category icons picked by cuk-webfront.js (trophy / timer / egg). */
+.cuk-badge-panel i.ph {
+    background: none !important;
+    color: var(--color-primary, currentColor) !important;
+}
+
+/* A badge tile: map heading, then a trophy row per placing. The tile's edge is
+   tinted by its best placing; each row's trophy and number by its own. */
+.cuk-badge {
+    --cuk-medal: #e8b923;
+    padding: 0.6rem 0.75rem !important;
+    border-left: 3px solid var(--cuk-medal) !important;
+}
+
+.tooltip-wrapper[data-cuk-place="2"] .cuk-badge {
+    --cuk-medal: #c9ced6;
+}
+
+.tooltip-wrapper[data-cuk-place="3"] .cuk-badge {
+    --cuk-medal: #cd8a4c;
+}
+
+.cuk-badge .meta-value-text {
+    display: block;
+    white-space: normal;
+    animation: none !important;
+    transform: none !important;
+}
+
+.cuk-map {
+    display: block;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    font-weight: 700;
+    color: var(--color-foreground, #fafafa);
+    margin-bottom: 0.3rem;
+}
+
+.cuk-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.cuk-row {
+    --cuk-row: #e8b923;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    line-height: 1.2;
+}
+
+.cuk-row[data-place="2"] {
+    --cuk-row: #c9ced6;
+}
+
+.cuk-row[data-place="3"] {
+    --cuk-row: #cd8a4c;
+}
+
+.cuk-row i {
+    font-size: 1rem;
+    color: var(--cuk-row);
+    flex: none;
+}
+
+.cuk-row b {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--cuk-row);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cuk-row small {
+    margin-left: auto;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-muted, #8c8c8c);
+    text-align: right;
+}
+
+.cuk-badge .marquee-text {
+    white-space: normal;
+    animation: none !important;
+    transform: none !important;
+}
+
+/* "12 gold · 3 silver · 1 bronze" under the category heading. */
+.cuk-tally {
+    margin: -0.35rem 0 0 2.25rem;
+    font-size: 0.65rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-muted, #8c8c8c);
+}
+
+/* cuk-hide-radar: the only radar-capable server is the PvP 7DTD server, and
+   its data source is switched off, so the page has nothing to show. */
+a[href="/radar"], a[href^="/radar/"] {
+    display: none !important;
+}
+
+/* Empty servers (cuk-webfront.js marks them): a slim row instead of a full
+   card - no banner art, no empty scoreboard or activity graph. They sit at the
+   bottom already, since the list is sorted by player count. */
+article[data-cuk-empty] {
+    align-self: start;
+}
+
+article[data-cuk-empty] .server-banner {
+    min-height: 0 !important;
+    background-image: none !important;
+    padding-top: 0.55rem !important;
+    padding-bottom: 0.45rem !important;
+}
+
+article[data-cuk-empty] .server-banner h3 {
+    font-size: 0.95rem;
+}
+
+article[data-cuk-empty] > .flex-1,
+article[data-cuk-empty] > .flex-1 ~ * {
+    display: none !important;
+}
+
+/* Zombies scoreboards: no Kills/Deaths columns (always 0). */
+article[data-cuk-zombies] [class*="grid-cols-[1fr_repeat(4"] {
+    grid-template-columns: 1fr repeat(2, minmax(30px, 44px)) 30px !important;
+}
+
+article[data-cuk-zombies] [class*="grid-cols-[1fr_repeat(4"] > :nth-child(3),
+article[data-cuk-zombies] [class*="grid-cols-[1fr_repeat(4"] > :nth-child(4) {
+    display: none !important;
+}
+
+/* ...and no anticheat rating (the lightning marks) on zombies cards, nor K, D,
+   K/D and Z (anticheat) in their scoreboard pop-up. */
+article[data-cuk-zombies] i.ph-lightning,
+article[data-cuk-zombies] [title="Rating"] {
+    display: none !important;
+}
+
+table[data-cuk-zombies] tr > :nth-child(3),
+table[data-cuk-zombies] tr > :nth-child(4),
+table[data-cuk-zombies] tr > :nth-child(5),
+table[data-cuk-zombies] tr > :nth-child(6) {
+    display: none !important;
+}
+
+/* Profile panels or tiles with nothing to show. */
+[data-cuk-hidden] {
+    display: none !important;
+}
+
+/* Sidebar logo. */
+[data-cuk-logo] {
+    background: none !important;
+    box-shadow: none !important;
+    overflow: hidden;
+}
+
+[data-cuk-logo] img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
