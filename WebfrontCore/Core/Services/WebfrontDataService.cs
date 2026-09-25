@@ -138,7 +138,6 @@ public class WebfrontDataService : IWebfrontDataService
                 PrivateClientSlots = server.PrivateClientSlots,
                 GameType = server.GametypeName,
                 GameTypeCode = server.Gametype,
-            ZombieRound = server.ZombieRound,
                 ZombieRound = server.ZombieRound,
                 ClientHistory = new ClientHistoryInfo
                 {
@@ -226,6 +225,7 @@ public class WebfrontDataService : IWebfrontDataService
             PrivateClientSlots = server.PrivateClientSlots,
             GameType = server.GametypeName,
             GameTypeCode = server.Gametype,
+            ZombieRound = server.ZombieRound,
             ClientHistory = new ClientHistoryInfo
             {
                 ClientCounts = clientHistory.ToList()
