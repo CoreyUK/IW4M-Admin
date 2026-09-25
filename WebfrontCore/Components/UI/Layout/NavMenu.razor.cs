@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using SharedLibraryCore;
 using WebfrontCore.Core.Services;
 using WebfrontCore.Components.UI.Navigation.Models;
+using WebfrontCore.Core;
 
 namespace WebfrontCore.Components.UI.Layout;
 
@@ -46,7 +47,7 @@ public partial class NavMenu : IDisposable
         if (NavData is not null)
         {
             ApplyNavData();
-            AppState.OnChange += StateHasChanged;
+            AppState.OnChange += OnAppStateChanged;
             return;
         }
 
@@ -61,7 +62,7 @@ public partial class NavMenu : IDisposable
             // Handle error (offline/api fail)
         }
 
-        AppState.OnChange += StateHasChanged;
+        AppState.OnChange += OnAppStateChanged;
     }
 
     private void ApplyNavData()
@@ -74,8 +75,11 @@ public partial class NavMenu : IDisposable
 
     public void Dispose()
     {
-        AppState.OnChange -= StateHasChanged;
+        AppState.OnChange -= OnAppStateChanged;
     }
+
+    // AppState is updated by background polls, so this can arrive on any thread.
+    private void OnAppStateChanged() => SafeRender.Queue(() => InvokeAsync(StateHasChanged));
 
     private string Loc(string key)
     {

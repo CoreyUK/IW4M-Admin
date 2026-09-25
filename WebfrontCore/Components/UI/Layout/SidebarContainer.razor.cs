@@ -1,4 +1,6 @@
-﻿namespace WebfrontCore.Components.UI.Layout;
+﻿using WebfrontCore.Core;
+
+namespace WebfrontCore.Components.UI.Layout;
 
 public partial class SidebarContainer
 {
@@ -7,9 +9,10 @@ public partial class SidebarContainer
         AppState.OnChange += OnAppStateChange;
     }
 
+    // AppState is updated by background polls, so this can arrive on any thread.
     private void OnAppStateChange()
     {
-        InvokeAsync(StateHasChanged);
+        SafeRender.Queue(() => InvokeAsync(StateHasChanged));
     }
 
     public void Dispose()

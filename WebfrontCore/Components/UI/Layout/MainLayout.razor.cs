@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components;
 using SharedLibraryCore.Dtos;
 using WebfrontCore.Core.Auth;
 using WebfrontCore.Core.Services;
+using WebfrontCore.Core;
 
 namespace WebfrontCore.Components.UI.Layout;
 
@@ -69,8 +70,11 @@ public partial class MainLayout
         }
 
         _isInitialized = true;
-        AppState.OnChange += StateHasChanged;
+        AppState.OnChange += OnAppStateChanged;
     }
+
+    // AppState is updated by background polls, so this can arrive on any thread.
+    private void OnAppStateChanged() => SafeRender.Queue(() => InvokeAsync(StateHasChanged));
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -80,6 +84,6 @@ public partial class MainLayout
 
     public void Dispose()
     {
-        AppState.OnChange -= StateHasChanged;
+        AppState.OnChange -= OnAppStateChanged;
     }
 }

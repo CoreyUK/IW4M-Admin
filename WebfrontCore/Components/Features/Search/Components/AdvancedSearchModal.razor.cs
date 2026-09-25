@@ -1,4 +1,6 @@
-﻿namespace WebfrontCore.Components.Features.Search.Components;
+﻿using WebfrontCore.Core;
+
+namespace WebfrontCore.Components.Features.Search.Components;
 
 public partial class AdvancedSearchModal
 {
@@ -6,13 +8,16 @@ public partial class AdvancedSearchModal
 
     protected override void OnInitialized()
     {
-        AppState.OnChange += StateHasChanged;
+        AppState.OnChange += OnAppStateChanged;
     }
 
     public void Dispose()
     {
-        AppState.OnChange -= StateHasChanged;
+        AppState.OnChange -= OnAppStateChanged;
     }
+
+    // AppState is updated by background polls, so this can arrive on any thread.
+    private void OnAppStateChanged() => SafeRender.Queue(() => InvokeAsync(StateHasChanged));
 
     private void Close()
     {

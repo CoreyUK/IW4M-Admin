@@ -208,9 +208,33 @@ namespace IW4MAdmin.Application
         /// </summary>
         private static void OnUnobservedTaskException(object sender, UnobservedTaskExceptionEventArgs e)
         {
-            Utilities.DefaultLogger?.LogError(e.Exception,
-                "Unobserved task exception (likely a plugin fire-and-forget that faulted); marking observed");
+            // A webfront circuit going away mid-render faults whatever render was in flight. That is
+            // a browser tab closing, not a fault worth a stack trace, and it happens in bursts every
+            // time the app restarts, so it is logged quietly to keep real plugin faults visible.
+            if (IsDisposedScopeFault(e.Exception))
+            {
+                Utilities.DefaultLogger?.LogDebug(
+                    "Ignoring a render that lost its circuit (disposed service provider)");
+            }
+            else
+            {
+                Utilities.DefaultLogger?.LogError(e.Exception,
+                    "Unobserved task exception (likely a plugin fire-and-forget that faulted); marking observed");
+            }
+
             e.SetObserved();
+        }
+
+        /// <summary>
+        ///     True when every fault in the task is a disposed DI scope, which is what a Blazor
+        ///     circuit torn down underneath an in-flight render looks like.
+        /// </summary>
+        private static bool IsDisposedScopeFault(AggregateException exception)
+        {
+            var faults = exception.Flatten().InnerExceptions;
+
+            return faults.Count > 0 && faults.All(fault =>
+                fault is ObjectDisposedException { ObjectName: "IServiceProvider" });
         }
 
         /// <summary>

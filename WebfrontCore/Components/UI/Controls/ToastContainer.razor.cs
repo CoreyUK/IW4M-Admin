@@ -1,4 +1,5 @@
-﻿using WebfrontCore.Core.Services;
+﻿using WebfrontCore.Core;
+using WebfrontCore.Core.Services;
 
 namespace WebfrontCore.Components.UI.Controls;
 
@@ -14,13 +15,13 @@ public partial class ToastContainer
     private void ShowToast(ToastMessage message)
     {
         _messages.Add(message);
-        InvokeAsync(StateHasChanged);
+        SafeRender.Queue(() => InvokeAsync(StateHasChanged));
     }
 
     private void Remove(ToastMessage message)
     {
         _messages.Remove(message);
-        InvokeAsync(StateHasChanged);
+        SafeRender.Queue(() => InvokeAsync(StateHasChanged));
     }
 
     public void Dispose()

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using WebfrontCore.Components.Features.Admin.Components;
 using WebfrontCore.Core.Services;
 using WebfrontCore.Components.UI.Navigation.Models;
+using WebfrontCore.Core;
 
 
 namespace WebfrontCore.Components.Features.Clients.Components;
@@ -21,7 +22,7 @@ public partial class ClientBadges : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        AppState.OnChange += StateHasChanged;
+        AppState.OnChange += OnAppStateChanged;
 
         try
         {
@@ -73,8 +74,11 @@ public partial class ClientBadges : IDisposable
         _cts?.Cancel();
         _cts?.Dispose();
         _badgeRefreshTimer?.Dispose();
-        AppState.OnChange -= StateHasChanged;
+        AppState.OnChange -= OnAppStateChanged;
     }
+
+    // AppState is updated by background polls, so this can arrive on any thread.
+    private void OnAppStateChanged() => SafeRender.Queue(() => InvokeAsync(StateHasChanged));
 
     private void ShowReports()
     {
